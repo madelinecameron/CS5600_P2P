@@ -1,12 +1,7 @@
 #ifndef SERVER_H_INCLUDED
 #define SERVER_H_INCLUDED
 
-/*
- * server.h
- *
- *  Created on: Sep 25, 2014
- *      Author: Madeline
- */
+// This is not actual code for the most part, it was just of me trying to mock stuff up
 
 #define PORT 5600
 
