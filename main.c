@@ -1,4 +1,4 @@
-//Uses Unix sockets (No WinSock!)
+//Uses Unix sockets 
 
 #include "server.h"
 #include <stdio.h>
