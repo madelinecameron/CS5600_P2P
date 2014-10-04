@@ -89,7 +89,7 @@ int main()
 	}
 
 
-	write(ns, buf, sizeof(buf));
+	write(ns, buf, strlen(buf));
 
 	close(sd); //close the socket
 

@@ -46,7 +46,7 @@ int main()
 		exit(1);
 	}
 
-	if((file = fopen("recieve.txt", "wb")) == NULL) //w for write, b for binary
+	if((file = fopen("receive.txt", "wb")) == NULL) //w for write, b for binary
 	{
 		printf("Error writing new file\n");
 		exit(1);
@@ -57,7 +57,7 @@ int main()
 
 	while(read(sd, buf, sizeof(buf)) > 0)
 	{
-		fwrite(buf, sizeof(char), sizeof(buf), file);
+		fwrite(buf, sizeof(char), strlen(buf), file);
 	}
 
 	close(sd); //close the socket
