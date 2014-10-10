@@ -1,3 +1,4 @@
+/* gcc server.c -o server -lnsl -pthread */
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -9,17 +10,14 @@
 #include <string.h>
 #include <time.h>
 
-/* gcc server.c -o server -lnsl -pthread */
-
 #define SERVER_PORT 63122
 #define MAX_CLIENT 10
 #define BUFFER_SIZE 512
 
-struct sockaddr_in server_addr;
-struct sockaddr_in client_addr;
-
-//socket, accept, and read
-int sd, ns, k;
+//socket for hosting the server (sd), socket for the client (ns)
+//We should have a variable for each peer. Use this variable in the peer thread.
+//Maybe construct a peer struct/class? Maybe an array of them? Contains socket variable, thread, etc.
+int sd, ns;
 
 //length of socketaddr structure
 int length;
@@ -36,7 +34,7 @@ int main()
 	struct sockaddr_in client_addr = { AF_INET };
 	length = sizeof( client_addr );
 	
-	/* create a stream socket */
+	/* Create a stream socket. Server will listen on this socket for peers. */
 	if ((sd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 	{
 		perror("Server Error: Socket Failed");
@@ -45,7 +43,7 @@ int main()
 	
 	//variable needed for setsokopt call
 	int setsock = 1;
-	//assists in using address
+	
 	if(setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &setsock, sizeof(setsock)) == -1)
 	{
 		perror("Server Error: Setsockopt failed");
@@ -61,12 +59,17 @@ int main()
 	
 	// listen for clients
 	printf(">>Server is now listening for up to 1 client\n");
-	if (listen(sd, 1) == -1) //1 = length of queue for pending connections
+	if (listen(sd, 1) == -1) //1 = length of queue for pending connections. We'll have to make this longer.
 	{
 		perror("Server Error: Listen failed");
 		exit(1);
 	}
+	
+	//In order to continously listen for clients, I think we'll need a while(!quit); loop, or something.
+	//For an example, see the "server.c" file in the "Chat Room - Reference" folder.
 
+	//If we decide to use a Peer struct, it's socket variable would replace "ns".
+	//Once a peer connects, create a thread.
 	if ((ns = accept(sd, (struct sockaddr*)&client_addr, &length)) == -1)
 	{
 		perror("Server Error: Accept Failed");
@@ -87,10 +90,12 @@ int main()
 	{
 		printf("Error loading file\n");
 	}
-
-
+	/* Perhaps for fread() and write(), we'll use a loop.
+	   Read a chunk, send a chunk. Repeat until entire file is read*/
 	write(ns, buf, strlen(buf));
-
+	
+	
+	fclose(file); // close the file stream
 	close(sd); //close the socket
 
 	return (0);
