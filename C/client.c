@@ -10,20 +10,24 @@
 
 #define SERVER_PORT 63122
 
-//Specifies address: Where we are connecting our socket.
-struct sockaddr_in server_addr = { AF_INET, htons( SERVER_PORT ) }; 
-struct hostent *hp; 
+//we'd read this in from the config file
+//Problem is.... how? C will complain ("error: variably modified array") if we dynamically allocate like that.
+#define CHUNK_SIZE 512
 
 //socket used to connect to server, and read data from
 int sd;
 //File pointer, Points to the file we want to read/write to.
 FILE *file;
 //Buffer used to send/receive. Data is loaded into buffer (see read() and fwrite()).
-char buf[512]; 
+char buf[CHUNK_SIZE]; 
 
 int main()
 {
-  //Example host name: “rc01xcs213.managed.mst.edu”	
+	//Specifies address: Where we are connecting our socket.
+	struct sockaddr_in server_addr = { AF_INET, htons( SERVER_PORT ) }; 
+	struct hostent *hp; 
+
+	//Example host name: rc01xcs213.managed.mst.edu
 	printf("Please Enter the Server You Would Like to Connect To\n");
 	scanf("%s", buf); //read the server address from the keyboard
 	
@@ -52,7 +56,7 @@ int main()
 	}
 
 	//Creates a file to be written to. "Recieve.txt" should be replaced with the actual name of the file
-	if((file = fopen("receive.txt", "wb")) == NULL) //w for write, b for binary
+	if((file = fopen(/*"receive.txt"*/ "dog2.jpg", "wb")) == NULL) //w for write, b for binary
 	{
 		printf("Error writing new file\n");
 		exit(1);
@@ -62,12 +66,15 @@ int main()
 	/* This might not be necessary. Since the test file I was sending with the server was < 512 bytes, I used strlen(buf)
 	   to only write the contents of the "send.txt" file. So once it read the first 0, it stopped writing.
 		 I'm not sure how strlen() will handle other files though.*/
-	memset(buf, 0, sizeof(buf));
+	memset(buf, '\0', sizeof(buf));
 
 	/*This should permit continuous reading. As long as someone is sending, the client will continue reading*/
-	while(read(sd, buf, sizeof(buf)) > 0)
+	int sent;
+	while((sent = read(sd, buf, sizeof(buf))) > 0)
 	{
-		fwrite(buf, sizeof(char), strlen(buf), file);
+		//Instead of writing the entire buffer, we only write the bits that were sent. This prevents us from writing any garbage data.
+		fwrite(buf, sizeof(char), sent, file);
+		memset(buf, '\0', sizeof(buf)); //reclear the buffer, so we don't accidently send some tailing data.
 	}
 
 	close(sd); //close the socket

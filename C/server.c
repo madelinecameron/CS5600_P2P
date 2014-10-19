@@ -12,7 +12,10 @@
 
 #define SERVER_PORT 63122
 #define MAX_CLIENT 10
-#define BUFFER_SIZE 512
+
+//we'd read this in from the config file
+//Problem is.... how? C will complain ("error: variably modified array") if we dynamically allocate like that.
+#define CHUNK_SIZE 512
 
 //socket for hosting the server (sd), socket for the client (ns)
 //We should have a variable for each peer. Use this variable in the peer thread.
@@ -26,7 +29,7 @@ int length;
 FILE *file;
 
 //Send contents of this buffer
-char buf[512];
+char buf[CHUNK_SIZE];
 
 int main()
 {
@@ -65,7 +68,7 @@ int main()
 		exit(1);
 	}
 	
-	//In order to continously listen for clients, I think we'll need a while(!quit); loop, or something.
+	//In order to continuously listen for clients, I think we'll need a while(!quit); loop, or something.
 	//For an example, see the "server.c" file in the "Chat Room - Reference" folder.
 
 	//If we decide to use a Peer struct, it's socket variable would replace "ns".
@@ -76,24 +79,23 @@ int main()
 	}
 
 	//open the file to be sent
-	if((file = fopen("send.txt", "rb")) == NULL) //r for read, b for binary
+	if((file = fopen(/*"send.txt"*/"dog.jpg", "rb")) == NULL) //r for read, b for binary
 	{
 		printf("Error opening file\n");
 		exit(1);
 	}
 
 	//clear the buffer
-	memset(buf, 0, sizeof(buf));
+	memset(buf, '\0', sizeof(buf));
 
-	//copy the file to be sent
-	if(fread(buf, sizeof(char), sizeof(buf), file) < 0)
+	//Read a chunk, send a chunk. Repeat until entire file is read/sent.
+	int read;
+	while((read = fread(buf, sizeof(char), CHUNK_SIZE, file)) > 0)
 	{
-		printf("Error loading file\n");
+		//Insead of sending the entire buffer, we only send the bits that were read by fread(). This prevents us from sending garbage data.
+		write(ns, buf, read);
+		memset(buf, '\0', sizeof(buf)); //reclear the buffer, so we don't accidently send some tailing data.
 	}
-	/* Perhaps for fread() and write(), we'll use a loop.
-	   Read a chunk, send a chunk. Repeat until entire file is read*/
-	write(ns, buf, strlen(buf));
-	
 	
 	fclose(file); // close the file stream
 	close(sd); //close the socket
