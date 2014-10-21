@@ -1,4 +1,8 @@
 /* gcc client.c -o client -lnsl -pthread */
+
+//Get current IP: http://stackoverflow.com/questions/212528/get-the-ip-address-of-the-machine
+//Get current IP: http://stackoverflow.com/questions/20237745/sockets-in-clinux-how-do-i-get-client-ip-port
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
