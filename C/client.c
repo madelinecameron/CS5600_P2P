@@ -11,6 +11,9 @@
 #include <netdb.h>       
 #include <pthread.h>
 #include <signal.h>
+#include <ifaddrs.h>
+#include <string.h> 
+#include <arpa/inet.h>
 
 #define SERVER_PORT 63122
 
@@ -23,7 +26,33 @@ int sd;
 //File pointer, Points to the file we want to read/write to.
 FILE *file;
 //Buffer used to send/receive. Data is loaded into buffer (see read() and fwrite()).
-char buf[CHUNK_SIZE]; 
+char buf[CHUNK_SIZE];
+char ipAddr[15];
+
+void getIPAddress(void)
+{
+    struct ifaddrs * ifAddrStruct=NULL;
+    struct ifaddrs * ifa=NULL;
+    void * tmpAddrPtr=NULL;
+	
+    getifaddrs(&ifAddrStruct);
+    for (ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr) {
+            continue;
+        }
+        if (ifa->ifa_addr->sa_family == AF_INET) { // check it is IP4
+            // is a valid IP4 Address
+            tmpAddrPtr=&((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
+            char addressBuffer[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
+			
+			if(strcmp(ifa->ifa_name, "lo") != 0) {
+				strcpy(ipAddr, addressBuffer);
+			}
+		}
+	}
+	//return ipAddr;
+}
 
 int main()
 {
@@ -58,7 +87,10 @@ int main()
 		perror( "Error: Connection Issue" ); 
 		exit(1);
 	}
-
+	
+	getIPAddress(); //Get its own IP
+	
+	printf("IP: %s\n", ipAddr);
 	//Creates a file to be written to. "Recieve.txt" should be replaced with the actual name of the file
 	if((file = fopen(/*"receive.txt"*/ "dog2.jpg", "wb")) == NULL) //w for write, b for binary
 	{
