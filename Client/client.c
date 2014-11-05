@@ -70,6 +70,7 @@ int main()
 		while((sent = read(sd, buf, sizeof(buf))) > 0)
 		{
 			printf("%s", buf);
+			memset(buf, '\0', sizeof(buf));
 		}
 	}
 	else if (strncmp(buf, "<createtracker", strlen("<createtracker")) == 0)
