@@ -1,5 +1,5 @@
 Filename: test
-Filesize: 10
-Description: test_description
-MD5: md5
-101.101:100:0:10:1413837257
+Filesize: 0
+Description: desc
+MD5: testmd5
+ip:port:0:size:1415075781

@@ -1,4 +1,6 @@
-/* gcc server.c -o server -lnsl -pthread */
+/* gcc server.c -o server -lnsl -pthread -lcrypto */
+#include "config.ini"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -11,15 +13,7 @@
 #include <time.h>
 #include <dirent.h> //for getting the number of files in a directory
 #include <unistd.h> //for checking to see if a file exists or not
-#include <openssl/md5.h> //for md5
-
-//we'd read these in from the config file
-#define SERVER_PORT 63122
-#define MAX_CLIENT 50
-
-//we'd read this in from the config file
-//Problem is.... how? C will complain ("error: variably modified array") if we dynamically allocate like that.
-#define CHUNK_SIZE 512
+#include "compute_md5.h"
 
 //socket for hosting the server
 int sock;
@@ -339,10 +333,11 @@ void *client_handler(void * index)
 			
 			//Check to see if tracker file already exists
 			sprintf(clients[client_index].m_buf, "Tracker Files/%s", tracker_filename);
+			sprintf(tracker_filename, "%s", clients[client_index].m_buf);
 			if (access(clients[client_index].m_buf, F_OK) == 0) //If that file exists.....
 			{
 				//open the file
-				if((clients[client_index].m_file = fopen(clients[client_index].m_buf, "r")) != NULL)
+				if((clients[client_index].m_file = fopen(tracker_filename, "r")) != NULL)
 				{
 					write(clients[client_index].m_peer_socket, "<REP GET BEGIN>\n", strlen("<REP GET BEGIN>\n"));
 					
@@ -354,8 +349,14 @@ void *client_handler(void * index)
 						memset(clients[client_index].m_buf, '\0', sizeof(clients[client_index].m_buf)); 
 					}
 					
-					//MD5 INFROMATION SHOULD GO AFTER END ie. <REP GET END 912ec803>
-					write(clients[client_index].m_peer_socket, "\n<REP GET END >\n", strlen("\n<REP GET END >\n"));
+					char * md5_string;
+					md5_string = computeMD5(tracker_filename);
+					
+					memset(clients[client_index].m_buf, '\0', sizeof(clients[client_index].m_buf));
+					sprintf(clients[client_index].m_buf, "\n<REP GET END %s>\n", md5_string);
+					free(md5_string);
+					
+					write(clients[client_index].m_peer_socket, clients[client_index].m_buf, strlen(clients[client_index].m_buf));
 				}
 				else
 				{
