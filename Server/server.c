@@ -29,10 +29,11 @@ struct peer
 
 struct peer clients[MAX_CLIENT];
 
+pthread_mutex_t file_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 void *client_handler(void * index);
 void setUpClientArray();
 int findClientArrayOpening();
-
 
 int main()
 {
@@ -159,7 +160,9 @@ void *client_handler(void * index)
 				//Check to see if tracker file already exists
 				memset(clients[client_index].m_buf, '\0', sizeof(clients[client_index].m_buf));
 				sprintf(clients[client_index].m_buf, "Tracker Files/%s.track", filename);
-				//If it does not exist
+				
+				pthread_mutex_lock(&file_mutex);
+				//If it already exists
 				if (access(clients[client_index].m_buf, F_OK) == 0)
 				{
 					write(clients[client_index].m_peer_socket, "<createtracker ferr>\n", strlen("<createtracker ferr>\n"));
@@ -183,6 +186,7 @@ void *client_handler(void * index)
 				{
 					write(clients[client_index].m_peer_socket, "<createtracker fail>\n", strlen("<createtracker fail>\n"));
 				}
+				pthread_mutex_unlock(&file_mutex);
 			}
 		}
 		else if (strncmp(clients[client_index].m_buf, "<updatetracker", strlen("<updatetracker")) == 0)
@@ -216,6 +220,8 @@ void *client_handler(void * index)
 			//Check to see if tracker file already exists
 			memset(clients[client_index].m_buf, '\0', sizeof(clients[client_index].m_buf));
 			sprintf(clients[client_index].m_buf, "Tracker Files/%s.track", filename);
+			
+			pthread_mutex_lock(&file_mutex);
 			//If it does not exist
 			if (access(clients[client_index].m_buf, F_OK) == -1)
 			{
@@ -236,12 +242,14 @@ void *client_handler(void * index)
 					write(clients[client_index].m_peer_socket, "<updatetracker fail>\n", strlen("<updatetracke fail>\n"));
 				}
 			}
+			pthread_mutex_unlock(&file_mutex);
 		}
 		else if (strncmp(clients[client_index].m_buf, "<REQ LIST>", strlen("<REQ LIST>")) == 0)
 		{
 			DIR *tracker_directory;
 			struct dirent *individual_file;
 			
+			pthread_mutex_lock(&file_mutex);
 			//Opens the "Tracker Files" folder, and counts the number of files
 			if ((tracker_directory = opendir("Tracker Files")) != NULL)
 			{
@@ -255,12 +263,16 @@ void *client_handler(void * index)
 						num_files = num_files + 1;
 					}
 				}
-				closedir(tracker_directory);
+				if (closedir(tracker_directory) == -1)
+				{
+					//what should we do if it wasn't closed successfully?
+				}
 				
 				//Send the first line of the LIST response.
 				sprintf(clients[client_index].m_buf, "<REP LIST %d>\n", num_files);
 				write(clients[client_index].m_peer_socket, clients[client_index].m_buf, strlen(clients[client_index].m_buf));
 			}
+			
 			if ((tracker_directory = opendir("Tracker Files")) != NULL)
 			{
 				int num_files = 0;
@@ -318,8 +330,12 @@ void *client_handler(void * index)
 				strcpy(clients[client_index].m_buf, "<REP LIST END>\n");
 				write(clients[client_index].m_peer_socket, clients[client_index].m_buf, strlen(clients[client_index].m_buf));
 				
-				closedir(tracker_directory);
+				if (closedir(tracker_directory) == -1)
+				{
+					//what should we do if it wasn't closed successfully?
+				}
 			}
+			pthread_mutex_unlock(&file_mutex);
 		}
 		else if (strncmp(clients[client_index].m_buf, "<GET", strlen("<GET")) == 0)
 		{
@@ -334,6 +350,8 @@ void *client_handler(void * index)
 			//Check to see if tracker file already exists
 			sprintf(clients[client_index].m_buf, "Tracker Files/%s", tracker_filename);
 			sprintf(tracker_filename, "%s", clients[client_index].m_buf);
+			
+			pthread_mutex_lock(&file_mutex);
 			if (access(clients[client_index].m_buf, F_OK) == 0) //If that file exists.....
 			{
 				//open the file
@@ -367,6 +385,7 @@ void *client_handler(void * index)
 			{
 				write(clients[client_index].m_peer_socket, "<GET invalid>", strlen("<GET invalid>"));
 			}
+			pthread_mutex_unlock(&file_mutex);
 		}
 	}
 	
