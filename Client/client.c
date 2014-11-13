@@ -1,4 +1,5 @@
 /* gcc client.c -o client -lnsl -pthread */
+#define _GNU_SOURCE //Used for findIP()
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -8,6 +9,8 @@
 #include <pthread.h>
 #include <signal.h>
 #include <string.h>
+#include <ifaddrs.h>
+#include <unistd.h>
 
 #define SERVER_PORT 63122
 
@@ -21,14 +24,52 @@ int sd;
 FILE *file;
 //Buffer used to send/receive. Data is loaded into buffer (see read() and fwrite()).
 char buf[CHUNK_SIZE]; 
+char* ip;
+
+int findCommand()
+{
+	char** isThisYourCmd = { NULL };
+	const char* createTracker = "<createtracker";
+	isThisYourCmd[0] = createTracker;
+
+	strcpy(isThisYourCmd, "<REQ LIST>");
+
+	for(int i = 0; strcmp(buf, isThisYourCmd[i]) != 0 && i < (sizeof(isThisYourCmd)/sizeof(char*)); i++)
+	{
+		printf("I'm totally doing stuff\nCmd: %s", isThisYourCmd[i]);
+	}
+}
+//Credit to: http://man7.org/linux/man-pages/man3/getifaddrs.3.html
+void findIP()
+{
+    struct ifaddrs *ifaddr, *ifa;
+    int family, s;
+    char host[NI_MAXHOST];
+
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+    {
+        if (ifa->ifa_addr == NULL)
+            continue;
+
+        s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+
+        if((strcmp(ifa->ifa_name,"eth0") == 0) && (ifa->ifa_addr->sa_family == AF_INET))
+        {
+            if (s != 0)
+            {
+                printf("getnameinfo() failed: %s\n", gai_strerror(s));
+                exit(EXIT_FAILURE);
+            }
+            strcpy(ip, ifa->ifa_name);
+        }
+    }
+}
 
 int main()
 {
 	//Specifies address: Where we are connecting our socket.
 	struct sockaddr_in server_addr = { AF_INET, htons( SERVER_PORT ) }; 
 	struct hostent *hp; 
-
-	
 
 	//Example host name: rc01xcs213.managed.mst.edu
 	//printf("Please Enter the Server You Would Like to Connect To\n");
@@ -60,6 +101,8 @@ int main()
 		perror( "Error: Connection Issue" ); 
 		exit(1);
 	}
+
+	getIP(); //Sets 'ip' with char* representation of address
 
 	int sent;
 	//memset(buf, '\0', sizeof(buf));
