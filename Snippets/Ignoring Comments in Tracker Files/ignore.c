@@ -61,8 +61,7 @@ enum rtn_val
 	INVALID_TRACKER_FILE = -1,
 	NO_ERROR = 0,
 	NO_NEXT_CHUNK = 1,
-	IS_LIVE_CHUNK = 2,
-	NOT_LIVE_CHUNK = 3
+	NOT_LIVE_CHUNK = 2
 };
 
 const char* test_ip_addr = "localhost";
@@ -119,15 +118,22 @@ int tracker_file_parser( char* tracker_file_name, char* filename, long filesize,
 
 
 /**
- * Append chunks saved in \b pending_chunks vector table.
- * Append all chunks in the \b pending_chunks vector table, chunks will be appended to the end of an existing tracker file as well as \b live_chunks vector table.
+ * Commit chunks saved in \b pending_chunks vector table.
+ * Commit all chunks in the \b pending_chunks vector table, chunks will be appended to the end of an existing tracker file as well as \b live_chunks vector table.
  *  
  * @param tracker_file_name File name -> tracker file.
- * @param pending_chunks \b pending_chunks vector table.
  *
  * @return \b NO_ERROR
  */
-int appendChunk( char* tracker_file_name );
+int commitPendingChunks( char* tracker_file_name );
+
+
+/**
+ * Append a chunk to pending_chunks vector table.
+ *
+ * @return \b NO_ERROR
+ */
+int appendChunk( struct live_chunks_struct test_chunk );
 
 
 /**
@@ -165,7 +171,7 @@ void clearLiveChunks();
  * Determine if a chunk is being shared
  * Determine if a chunk is being shared ( is it in \b live_chunks vector table ? )
  *
- * @return \b NO_ERROR
+ * @return chunk index in live_chunks if found, \b NOT_LIVE_CHUNK if not.
  */
 int isLiveChunk( struct live_chunks_struct test_chunk );
 
@@ -208,7 +214,7 @@ int testMain()
 		long test_end = 2345678;
 		long test_time_stamp = 1999999999;
 		
-		printf( "\n\r[TEST] Testing appendChunk() & findNextChunk() with start_byte = %ld, end_byte = %ld ...\n",
+		printf( "\n\r[TEST] Testing commitPendingChunks() & findNextChunk() with start_byte = %ld, end_byte = %ld ...\n",
 				test_start,
 				test_end
 				);
@@ -225,7 +231,7 @@ int testMain()
 			test_time_stamp++;
 		}
 		
-		appendChunk( test_tracker_filename );
+		commitPendingChunks( test_tracker_filename );
 		
 		int next_chunk_i = findNextChunk( test_start, test_end );
 		if( next_chunk_i >= 0 )
@@ -251,8 +257,8 @@ int testMain()
 		printf( "[TEST] Testing isLiveChunk() with live_chunks[1] \n\r" );
 		int test_rtn;
 		test_rtn = isLiveChunk( live_chunks[1] );
-		if( test_rtn == IS_LIVE_CHUNK ) printf( "[TEST] live_chunks[1] is live!\n\r" );
-		else if ( test_rtn == NOT_LIVE_CHUNK ) printf( "[TEST] live_chunks[1] is offline!\n\r" );
+		if( test_rtn != NOT_LIVE_CHUNK ) printf( "[TEST] test_chunk is live @ live_chunks[%d]!\n\r", test_rtn );
+		else printf( "[TEST] test_chunk is offline!\n\r" );
 		
 		printf( "[TEST] Testing DONE!\n\n" );
 	}
@@ -405,7 +411,24 @@ int findNextChunk( long start, long end )
 	else return NO_NEXT_CHUNK;
 }
 
-int appendChunk( char* tracker_file_name )
+
+int appendChunk( struct live_chunks_struct test_chunk )
+{
+	int num_of_pending_chunks = pending_chunks.size();
+	if( num_of_pending_chunks < 0 ) return INVALID_PENDING_CHUNK_TABLE;
+	
+	pending_chunks.push_back( live_chunks_struct() );
+	strcpy( pending_chunks[ num_of_pending_chunks ].ip_addr, test_chunk.ip_addr );
+	pending_chunks[ num_of_pending_chunks ].port_num = test_chunk.port_num;
+	pending_chunks[ num_of_pending_chunks ].start_byte = test_chunk.start_byte;
+	pending_chunks[ num_of_pending_chunks ].end_byte = test_chunk.end_byte;
+	pending_chunks[ num_of_pending_chunks ].time_stamp = test_chunk.time_stamp;
+	
+	return NO_ERROR;
+}
+
+
+int commitPendingChunks( char* tracker_file_name )
 {
 	FILE* tracker_file_h;
 	int num_of_live_chunks = live_chunks.size();
@@ -526,7 +549,7 @@ int isLiveChunk( struct live_chunks_struct test_chunk )
 		n++;
 	}
 	
-	if( found == 1 ) return IS_LIVE_CHUNK;
+	if( found == 1 ) return n-1;
 	else return NOT_LIVE_CHUNK;
 }
 
