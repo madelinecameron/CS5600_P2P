@@ -89,7 +89,7 @@ int findClientArrayOpening();
  * The server will then read a command from that peer's socket, and process that command.
  * Once that single command has been processed, the server disconnect from the peer.
  */
-int main()
+int main(int argc, const char* argv[])
 {
 	struct sockaddr_in server_addr = {AF_INET, htons( SERVER_PORT )};
 	struct sockaddr_in client_addr = {AF_INET};
@@ -149,6 +149,7 @@ int main()
 			}
 			else
 			{
+				printf("Client has connected.\n");
 				/* Spin off a thread to process the peer. The peer's index in the clients array is passed as a 
 				 * parameter to indicate which peer is being processed. */
 				if (pthread_create(&(clients[client_array_index].m_thread), NULL, &client_handler, &(clients[client_array_index].m_index)) != 0)
@@ -529,7 +530,7 @@ void setUpClientArray()
 	{
 		/* Set each m_index = to it's index in the array.  */
 		clients[index].m_index = index;
-		/* A m_socet value of 01 indicates that this element of the array is not being used. */
+		/* A m_socet value of -1 indicates that this element of the array is not being used. */
 		clients[index].m_peer_socket = -1;
 	}
 	return;
