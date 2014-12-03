@@ -67,13 +67,24 @@ int main(int argc, const char* argv[])
 	findIP(); //Sets 'ip' with char* representation of address
 	*/
 	
+	
+	
+	
+	//IF MODE == SEED
 	/* Spin off a seed thread */
+	/* TAKE THE CONTENTS OF THE SEED FUNCTION, PUT IT HERE
+	/* SPIN OFF A CLIENT_HANDLER THREAD
+	 * CREATE TRACKER
+	/* OLD STUFF
 	if (pthread_create(&main_seed_thread, NULL, &seed, NULL) != 0)
 	{
 		printf("Error Creating Seed Thread\n");
 		exit(1);
 	}
+	*/
 	
+	
+	//IF MODE == DOWNLOAD
 	int sent;
 	while (1)
 	{
@@ -207,6 +218,9 @@ void *client_handler(void * index)
 	 *   SAYING WHAT FILE IT WANTS   *  //Is this how we should do this?
 	 ******************************
 	 ******************************/
+	 
+	 //UPDATE TRACKER EVERY 10 SECONDS
+	 
 	
 	/*When we're done sharing*/
 	if (close(peers[client_index].m_peer_socket) != 0)
