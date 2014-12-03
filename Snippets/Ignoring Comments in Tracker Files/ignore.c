@@ -34,7 +34,7 @@
         Types & Structures
 -----------------------------------*/
 /**
- * Storing information of a file chunk.
+ * Store information of a file chunk.
  */
 struct chunks_struct
 {
@@ -46,7 +46,7 @@ struct chunks_struct
 };
 
 /**
- * Storing information of a tracked/sharing file.
+ * Store information of a tracked/sharing file.
  */
 struct tracked_file_info_struct
 {
@@ -60,13 +60,13 @@ struct tracked_file_info_struct
         Enums & const string
 -----------------------------------*/
 /**
- * Some return value in plain English for less grey-matter damage.
+ * Some return value in plain English to lessen Grey-matter damage.
  */
 enum rtn_val
 {
 	INVALID_TRACKER_INFO = -4,			///< \b tracked_file_info object error
-	INVALID_PENDING_CHUNK_TABLE = -3,	///< \b pending_chunks vector table error
-	INVALID_CHUNK_TABLE = -2,			///< \b live_chunks vector table error
+	INVALID_PENDING_CHUNK_TABLE = -3,	///< \b pending_chunks vector error
+	INVALID_CHUNK_TABLE = -2,			///< \b live_chunks vector error
 	INVALID_TRACKER_FILE = -1,			///< Error accessing tracker file
 	NO_ERROR = 0,						///< Normal return value
 	NO_NEXT_CHUNK = 1,					///< No matched next chunk found - findNextChunk()
@@ -80,12 +80,32 @@ int test_port_num = 12345;				///< Port number for testing mode
 /*-----------------------------------
             Variables
 -----------------------------------*/
+/**
+ * Tracked file info structure.
+ * -This structure is responsible of holding information for the tracked file,
+ * it is used in createTracker().
+ * -Initialize it when you want to create a new tracker file.
+ * -tracker_file_parser() may populate this structure and use it as buffer.
+ * 
+ */
+tracked_file_info_struct tracked_file_info;
 
-tracked_file_info_struct tracked_file_info;	///< Initialize tracked file object.
 
-std::vector<chunks_struct> live_chunks;		///< Initialize chunk info vector table.
+/**
+ * Live chunks vector.
+ * This vector is a synchronous copy of all the chunks in a particular tracker file.
+ * It allows fast access to all chunks the client is currently sharing.
+ * 
+ */
+std::vector<chunks_struct> live_chunks;
 
-std::vector<chunks_struct> pending_chunks;	///< Initialize pending chunk info vector table.
+/**
+ * Pending chunks vector.
+ * This vector stores all chunks waiting to be appended to live_chunks vector.
+ * Append new chunks to share in this vector and then commit it to make them available for sharing. 
+ * 
+ */
+std::vector<chunks_struct> pending_chunks;
 
 /*-----------------------------------
             Prototypes
@@ -100,25 +120,27 @@ int testMain();
 
 /**
  * Find the next chunk to down load from the tracker file.
- * Find the next chunk to download using a starting byte & ending byte combination in the tracker file, return the chunk with the largest(latest) time stamp if there are multiple available.
+ * Find the next chunk to download using a start byte & end byte combination in the tracker file, 
+ * return the chunk with the largest(latest) time stamp if there are multiple available.
  * 
  * @param start The starting byte of next chunk to download.
  * @param end The ending byte of the next chunk to download.
  *
- * @return If the a chunk matches the starting & ending byte is found, return the index of that chunk in the chunk table, else return \b NO_NEXT_CHUNK.
+ * @return If a chunk matching the start & end byte is found, return the index of that chunk in the live_chunks vector, else return \b NO_NEXT_CHUNK.
  */
 int findNextChunk( long start, long end );
 
 
 /**
  * Parse the tracker file to obtain file & chunk information.
- * Parse the tracker file using tracker file's name to obtain file name, file size, and description. Also populates the live_chunks vector table if tracker file contains lines for file chunks.
+ * Parse the tracker file using tracker file's name to obtain file name, file size, and description.
+ * Also populates the live_chunks vector if tracker file contains lines for file chunks.
  * 
- * @param tracker_file_name File name -> tracker file.
- * @param filename File name -> tracked file.
- * @param filesize File size in bytes -> tracked file.
- * @param description Description -> tracked file.
- * @param md5 MD5 -> tracked file.
+ * @param tracker_file_name File name -> tracker file; Input buffer
+ * @param filename File name -> tracked file; Output buffer buffer
+ * @param filesize File size in bytes -> tracked file; Output buffer
+ * @param description Description -> tracked file; Output buffer
+ * @param md5 MD5 -> tracked file; Output buffer
  *
  * @return \b NO_ERROR, \b NO_NEXT_CHUNK, \b INVALID_CHUNK_TABLE
  */
@@ -126,10 +148,11 @@ int tracker_file_parser( char* tracker_file_name, char* filename, long filesize,
 
 
 /**
- * Commit chunks saved in \b pending_chunks vector table.
- * Commit all chunks in the \b pending_chunks vector table, chunks will be appended to the end of an existing tracker file as well as \b live_chunks vector table.
+ * Commit chunks saved in \b pending_chunks vector.
+ * Commit all chunks in the \b pending_chunks vector, chunks will be appended to the end of 
+ * an existing tracker file as well as \b live_chunks vector.
  *  
- * @param tracker_file_name File name -> tracker file.
+ * @param tracker_file_name File name -> tracker file to be appended to.
  *
  * @return \b NO_ERROR
  */
@@ -137,9 +160,9 @@ int commitPendingChunks( char* tracker_file_name );
 
 
 /**
- * Append a chunk to pending_chunks vector table.
+ * Append a chunk to pending_chunks vector.
  *
- * @param test_chunk Test chunk struct to be appended.
+ * @param test_chunk Test chunk structure to be appended.
  * 
  * @return \b NO_ERROR
  */
@@ -147,8 +170,8 @@ int appendChunk( struct chunks_struct test_chunk );
 
 
 /**
- * Update tracker file with current content in \b live_chunks vector table.
- * Populate \b live_chunks & \b tracked_file_info vector table with &chunks & file information before calling this function.
+ * Update tracker file with current content in \b live_chunks vector.
+ * Populate \b live_chunks & \b tracked_file_info vector with chunks & file information before calling this function.
  *
  * @return \b NO_ERROR
  */
@@ -156,22 +179,24 @@ int createTracker();
 
 
 /**
- * Initialize \b live_chunks vector table for createTracker().
- * Commits all chunks in \b pending_chunks vector table to \b live_chunks vector table to get ready for createTracker() creating new tracker file. \b live_chunks vector table will be cleared and repopulated, \b pending_chunks vector table will be cleared after execution.
+ * Initialize \b live_chunks vector for createTracker().
+ * Commits all chunks in \b pending_chunks vector to \b live_chunks vector to get ready for
+ * createTracker() creating new tracker file.
+ * \b live_chunks vector will be cleared and repopulated, \b pending_chunks vector will be cleared.
  * 
  */
 void initialTrackerChunks();
 
 
 /**
- * Clear \b pending_chunks vector table.
+ * Clear \b pending_chunks vector.
  * 
  */
 void clearPendingChunks();
 
 
 /**
- * Clear \b live_chunks vector table.
+ * Clear \b live_chunks vector.
  * 
  */
 void clearLiveChunks();
@@ -179,9 +204,9 @@ void clearLiveChunks();
 
 /**
  * Determine if a chunk is being shared
- * Determine if a chunk is being shared ( is it in \b live_chunks vector table ? )
+ * Determine if a chunk is being shared ( is it in \b live_chunks vector ? )
  *
- * @return chunk index in live_chunks if found, \b NOT_LIVE_CHUNK if not.
+ * @return Index of the chunk in live_chunks vector if found, \b NOT_LIVE_CHUNK if not.
  */
 int isLiveChunk( struct chunks_struct test_chunk );
 
@@ -191,13 +216,6 @@ int isLiveChunk( struct chunks_struct test_chunk );
 -----------------------------------*/
 int main()
 {
-	/**
-	 * 1. Get IP & port either from user input or config
-	 * 2. 	a. If user wants to share file, make sure file exist, then get file properties into tracked_file_info vector table.
-	 *		b. Calculate sharing info for all sharing chunks and populate pending_chunks vector table.
-	 *		c. 
-	 *    	d. When sharing chunks change dramatically, call createTracker() and push out new tracker file to server periodically.
-	 */
 	testMain();
 	return 0;
 }
@@ -259,7 +277,7 @@ int testMain()
 		}
 		else printf( "[TEST] No next chunk found\n" );
 		
-		printf( "[TEST] Testing createTracker() with new tracker filename = %s, filesize = %ld, description = %s, md5 = %s\n\r",
+		printf( "[TEST] Testing createTracker() with 	filename = %s, filesize = %ld, \n					description = %s, md5 = %s\n\r",
 				test_filename,
 				test_filesize,
 				test_description,
@@ -270,7 +288,7 @@ int testMain()
 		createTracker();
 		
 		//test isLiveChunk()
-		printf( "[TEST] Testing isLiveChunk() with live_chunks[1] \n\r" );
+		printf( "[TEST] Testing isLiveChunk() \n\r" );
 		int test_rtn;
 		test_rtn = isLiveChunk( live_chunks[1] );
 		if( test_rtn != NOT_LIVE_CHUNK ) printf( "[TEST] test_chunk is live @ live_chunks[%d]!\n\r", test_rtn );
@@ -341,7 +359,7 @@ int tracker_file_parser( char* tracker_file_name, char* filename, long filesize,
 		}
 		
 		
-		/** Reset live_chunks vector table, initilize chunk counter  */
+		/** Reset live_chunks vector, initialize chunk counter  */
 		int n=0;
 		clearLiveChunks();
 		
@@ -359,7 +377,7 @@ int tracker_file_parser( char* tracker_file_name, char* filename, long filesize,
 			/**
 			 * For not-comment lines, make a copy of the line into \b temp_line.
 			 * Parse out IP address, Port number, Start byte, End byte, and Time stamp.
-			 * Append new chunk to \b live_chunks vector table and store parsed values.
+			 * Append new chunk to \b live_chunks vector and store parsed values.
 			 * 
 			 */
 			if (strncmp(line, "#", 1) != 0)
@@ -420,7 +438,7 @@ int tracker_file_parser( char* tracker_file_name, char* filename, long filesize,
 
 int findNextChunk( long start, long end )
 {
-	/** Get live_chunks vector table size  */
+	/** Get live_chunks vector size  */
 	int num_of_live_chunks = live_chunks.size();
 	
 	/** Return \b INVALID_CHUNK_TABLE if table size is invalid  */
@@ -429,12 +447,12 @@ int findNextChunk( long start, long end )
 	long latest_time = 0;			///< Buffer for time stamp
 	int next_chunk_index = -1;		///< Buffer for next chunk index, default to -1
 	
-	std::vector<int> chunk_index;	///< Keep track of potential chunks in vector table
+	std::vector<int> chunk_index;	///< Keep track of potential chunks in vector
 	
-	/** Loop through all chunks in live_chunks vector table  */
+	/** Loop through all chunks in live_chunks vector  */
 	for( int i=0; i<num_of_live_chunks; i++ )
 	{
-		/** Append matching chunks to vector table, update time stamp if it's more current  */
+		/** Append matching chunks to vector, update time stamp if it's more current  */
 		if( ( live_chunks[i].start_byte == start ) && ( live_chunks[i].end_byte == end ) )
 		{
 			chunk_index.push_back( i );
@@ -463,32 +481,45 @@ int findNextChunk( long start, long end )
 
 int appendChunk( struct chunks_struct test_chunk )
 {
+	/** Get pending_chunks vector size */
 	int num_of_pending_chunks = pending_chunks.size();
+	/** If size is invalid, return \b INVALID_PENDING_CHUNK_TABLE */
 	if( num_of_pending_chunks < 0 ) return INVALID_PENDING_CHUNK_TABLE;
 	
+	
+	/** Append new chunk to pending_chunks vector */
 	pending_chunks.push_back( chunks_struct() );
+	
+	/** Fill in all chunk information */
 	strcpy( pending_chunks[ num_of_pending_chunks ].ip_addr, test_chunk.ip_addr );
 	pending_chunks[ num_of_pending_chunks ].port_num = test_chunk.port_num;
 	pending_chunks[ num_of_pending_chunks ].start_byte = test_chunk.start_byte;
 	pending_chunks[ num_of_pending_chunks ].end_byte = test_chunk.end_byte;
 	pending_chunks[ num_of_pending_chunks ].time_stamp = test_chunk.time_stamp;
 	
+	/** Return normal */
 	return NO_ERROR;
 }
 
 
 int commitPendingChunks( char* tracker_file_name )
 {
-	FILE* tracker_file_h;
+	FILE* tracker_file_h;		///< File handle for tracker file
+	
+	/** Get live_chunks vector size */
 	int num_of_live_chunks = live_chunks.size();
+	/** If size is invalid, return INVALID_PENDING_CHUNK_TABLE */
 	if( num_of_live_chunks < 0 ) return INVALID_CHUNK_TABLE;
 	
+	/** Get pending_chunks vector size */
 	int num_of_pending_chunks = pending_chunks.size();
+	/** If size is invalid, return INVALID_PENDING_CHUNK_TABLE */
 	if( num_of_pending_chunks <= 0 ) return INVALID_PENDING_CHUNK_TABLE;
 	
+	/** Open tracker file */
 	tracker_file_h = fopen( tracker_file_name, "a+" );
 	
-	//add chunk info for all pending chunks to chunk table
+	/** Add chunk info for all pending chunks to live_chunks vector */
 	for( int n=0; n<num_of_pending_chunks; n++ )
 	{
 		live_chunks.push_back( chunks_struct() );
@@ -498,7 +529,7 @@ int commitPendingChunks( char* tracker_file_name )
 		live_chunks[ num_of_live_chunks ].end_byte = pending_chunks[n].end_byte;
 		live_chunks[ num_of_live_chunks ].time_stamp = pending_chunks[n].time_stamp;
 		
-		//add new chunk to tracker file
+		/** Add new chunk to tracker file */
 		fprintf( tracker_file_h, "\r\n%s:%d:%ld:%ld:%ld",
 				pending_chunks[n].ip_addr,
 				pending_chunks[n].port_num,
@@ -507,19 +538,26 @@ int commitPendingChunks( char* tracker_file_name )
 				pending_chunks[n].time_stamp
 				);
 				
+		/** Increment live_chunks counter */
 		num_of_live_chunks++;
 	}
+	/** CLear pending_chunks vector */
 	clearPendingChunks();
 	
+	/** CLose tracker file handle */
 	fclose( tracker_file_h );
+	/** return normal */
 	return NO_ERROR;
 }
 
 
 int createTracker()
 {
-	char tracker_file_name[ FILENAME_SIZE ];
+	char tracker_file_name[ FILENAME_SIZE ];		///< Tracker file name buffer
+	
+	/** If tracked file info struct is un-initialized, return \b INVALID_TRACKER_INFO */
 	if( tracked_file_info.filename[0] == '\0' ) return INVALID_TRACKER_INFO;
+	/** Else generate tracker file name using tracked file name */
 	else
 	{
 		char tracker_file_ext[] = ".track";
@@ -527,13 +565,16 @@ int createTracker()
 		strcat( tracker_file_name, tracker_file_ext );
 	}
 	
+	/** Get live_chunks vector size */
 	int num_of_live_chunks = live_chunks.size();
+	/** If size is invalid, return INVALID_PENDING_CHUNK_TABLE */
 	if( num_of_live_chunks < 0 ) return INVALID_CHUNK_TABLE;
 	
-	FILE* tracker_file_h;
+	FILE* tracker_file_h;		///< File handle for tracker file
+	/** Create tracker file */
 	tracker_file_h = fopen( tracker_file_name, "w" );
 	
-	//construct tracker file header info
+	/** Write tracker file header info */
 	fprintf( tracker_file_h, "Filename: %s\nFilesize: %ld\nDescription: %s\nMD5: %s\n#test_comments",
 				tracked_file_info.filename,
 				tracked_file_info.filesize,
@@ -541,9 +582,9 @@ int createTracker()
 				tracked_file_info.md5
 				);
 	
+	/** Write chunks info for all chunks in live_chunks vector */
 	for( int n=0; n< num_of_live_chunks; n++ )
 	{
-		//add chunk info to tracker file
 		fprintf( tracker_file_h, "\r\n%s:%d:%ld:%ld:%ld",
 				live_chunks[n].ip_addr,
 				live_chunks[n].port_num,
@@ -553,18 +594,23 @@ int createTracker()
 				);
 	}
 	
+	/** Close tracker file handle */
 	fclose( tracker_file_h );
+	/** Return normal */
 	return NO_ERROR;
 }
 
 
 void initialTrackerChunks()
 {
+	/** Get pending_chunks vector size */
 	int num_of_pending_chunks = pending_chunks.size();
+	/** If pending_chunks vector is not empty */
 	if( num_of_pending_chunks > 0 )
 	{
+		/** Clear the live_chunks vector */
 		clearLiveChunks();
-		//add chunk info for all pending chunks to chunk table
+		/** Add chunk info for all pending chunks to chunk table */
 		for( int n=0; n<num_of_pending_chunks; n++ )
 		{
 			live_chunks.push_back( chunks_struct() );
@@ -574,6 +620,7 @@ void initialTrackerChunks()
 			live_chunks[ n ].end_byte = pending_chunks[n].end_byte;
 			live_chunks[ n ].time_stamp = pending_chunks[n].time_stamp;
 		}
+		/** CLear pending_chunks vector */
 		clearPendingChunks();
 	}
 }
@@ -581,10 +628,12 @@ void initialTrackerChunks()
 
 int isLiveChunk( struct chunks_struct test_chunk )
 {
-	int found=0;
+	int found=0;		///< Found flag
+	int n=0;			///< Iterator for live_chunks vector
+	/** Get live_chunks vector size */
 	int num_of_live_chunks = live_chunks.size();
-	int n=0;
 	
+	/** Loop through live_chunks vector to find a matching chunk with test_chunk */
 	while( ( found == 0 ) && ( n<num_of_live_chunks ) )
 	{
 		if( ( strncmp( live_chunks[n].ip_addr, test_chunk.ip_addr, IP_ADDR_SIZE ) == 0 ) &&
@@ -598,18 +647,22 @@ int isLiveChunk( struct chunks_struct test_chunk )
 		n++;
 	}
 	
+	/** If a matching chunk is found, return its index in live_chunks vector */
 	if( found == 1 ) return n-1;
+	/** Else return \b NOT_LIVE_CHUNK */
 	else return NOT_LIVE_CHUNK;
 }
 
 
 void clearPendingChunks()
 {
+	/** Invoke vector clear for pending_chunks */
 	pending_chunks.clear();
 }
 
 
 void clearLiveChunks()
 {
+	/** Invoke vector clear for live_chunks */
 	live_chunks.clear();
 }
