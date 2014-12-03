@@ -78,3 +78,5 @@ $RECYCLE.BIN/
 *.cbp
 *.layout
 *.track
+src/client/client
+src/server/server
