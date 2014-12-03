@@ -147,7 +147,7 @@ int main(int argc, const char* argv[])
 		else if (strncmp(buf, "<GET", strlen("<GET")) == 0)
 		{
 			FILE *file;
-			char tokenize[CHUNK_SIZE];
+			char tokenize[CHUNK_SIZE], filename[CHUNK_SIZE];
 			char *line;
 			if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
 			{
@@ -166,11 +166,11 @@ int main(int argc, const char* argv[])
 			/*Get the tracker filename*/
 			line = strtok(tokenize, " ");
 			line  = strtok(NULL, ">");
-			strcpy(buf, line);
+			strcpy(filename, line);
 			
-			if (access(buf, F_OK) != 0)
+			if (access(filename, F_OK) != 0)
 			{
-				file = fopen(buf, "wb");
+				file = fopen(filename, "wb");
 
 				memset(buf, '\0', sizeof(buf));
 				while((sent = read(server_sock, buf, sizeof(buf))) > 0)
