@@ -464,7 +464,15 @@ void *client_handler(void * index)
 				/** Next, it opens the file, and copies it's contents. */
 				if((clients[client_index].m_file = fopen(tracker_filename, "r")) != NULL)
 				{
-					write(clients[client_index].m_peer_socket, "<REP GET BEGIN>\n", strlen("<REP GET BEGIN>\n"));
+				
+					/* ADD ME BACK LATER
+					*
+					*
+					//write(clients[client_index].m_peer_socket, "<REP GET BEGIN>\n", strlen("<REP GET BEGIN>\n"));
+					*
+					*
+					*
+					*/
 					
 					memset(clients[client_index].m_buf, '\0', sizeof(clients[client_index].m_buf));
 					int read;
@@ -480,10 +488,22 @@ void *client_handler(void * index)
 					md5_string = computeMD5(tracker_filename);
 					
 					memset(clients[client_index].m_buf, '\0', sizeof(clients[client_index].m_buf));
-					sprintf(clients[client_index].m_buf, "\n<REP GET END %s>\n", md5_string);
+					/* ADD ME BACK LATER
+					*
+					*
+					sprintf(clients[client_index].m_buf, "\n<REP GET END %s>", md5_string);
+					*
+					*
+					*/
 					free(md5_string);
 					
+					/* ADD ME BACK LATER
+					*
+					*
 					write(clients[client_index].m_peer_socket, clients[client_index].m_buf, strlen(clients[client_index].m_buf));
+					*
+					*
+					*/
 				}
 				/** If the tracker file could not be opened, the server sends the peer a "GET invalid" protocol error message. */
 				else

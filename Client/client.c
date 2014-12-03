@@ -12,19 +12,318 @@
 #include <ifaddrs.h>
 #include <unistd.h>
 
-#define SERVER_PORT 63122
-
 //we'd read this in from the config file
-//Problem is.... how? C will complain ("error: variably modified array") if we dynamically allocate like that.
+#define SERVER_PORT 63122
+#define SEED_PORT 63123
+#define MAX_CLIENT 10
 #define CHUNK_SIZE 512
 
-//socket used to connect to server, and read data from
-int sd;
-//File pointer, Points to the file we want to read/write to.
-FILE *file;
+//socket used to connect to server
+int server_sock;
+//socket used to act as "server"
+int seed_sock;
+pthread_t main_seed_thread;
+
+struct peer
+{
+	int m_peer_socket; ///< Communication socket for this peer. If value = \b -1, this peer is currently not being used.
+	int m_index; ///< Location of peer in the \a peers array.
+	char m_buf[CHUNK_SIZE];  ///< Character array used to copy data into/out of \a m_peer_socket
+	FILE *m_file; ///< File pointer used to open tracker files.
+	pthread_t m_thread; ///< Thread where commands from peer will be processed.
+};
+
+struct peer peers[MAX_CLIENT];
+
+void setUpPeerArray();
+int findPeerArrayOpening();
+
+void *client_handler(void * index);
+void *seed(void * param);
+
+int findCommand();
+void findIP();
+
 //Buffer used to send/receive. Data is loaded into buffer (see read() and fwrite()).
 char buf[CHUNK_SIZE];
 char* ip;
+
+int main(int argc, const char* argv[])
+{
+	//Specifies address: Where we are connecting our socket.
+	struct sockaddr_in server_addr = { AF_INET, htons( SERVER_PORT ) };
+	struct hostent *hp;
+
+	if((hp = gethostbyname("localhost")) == NULL)
+	{
+		printf("Error: Unknown Host");
+		exit(1);
+	}
+
+	bcopy( hp->h_addr_list[0], (char*)&server_addr.sin_addr, hp->h_length );
+
+	/*
+    findCommand();
+	findIP(); //Sets 'ip' with char* representation of address
+	*/
+	
+	/* Spin off a seed thread */
+	if (pthread_create(&main_seed_thread, NULL, &seed, NULL) != 0)
+	{
+		printf("Error Creating Seed Thread\n");
+		exit(1);
+	}
+	
+	int sent;
+	while (1)
+	{
+		fgets(buf, sizeof(buf), stdin);
+		
+		if (strncmp(buf, "<REQ LIST>", strlen("<REQ LIST>")) == 0)
+		{
+			/* create a socket */
+			/* internet stream socket, TCP */
+			if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
+			{
+				perror( "Error: socket failed" );
+				exit( 1 );
+			}
+
+			/*connect to the server */
+			/* now when we need to communicate to the server, we do it over "server_sock" */
+			if (connect( server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr) ) == -1 )
+			{
+				perror( "Error: Connection Issue" );
+				exit(1);
+			}
+		
+			write(server_sock, "<REQ LIST>", strlen("<REQ LIST>"));
+			memset(buf, '\0', sizeof(buf));
+			while((sent = read(server_sock, buf, sizeof(buf))) > 0)
+			{
+				printf("%s", buf);
+				memset(buf, '\0', sizeof(buf));
+			}
+		}
+		else if (strncmp(buf, "<createtracker", strlen("<createtracker")) == 0)
+		{		
+			if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
+			{
+				perror( "Error: socket failed" );
+				exit( 1 );
+			}
+			if (connect( server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr) ) == -1 )
+			{
+				perror( "Error: Connection Issue" );
+				exit(1);
+			}
+			
+			while((sent = read(server_sock, buf, sizeof(buf))) > 0)
+			{
+				printf("%s", buf);
+			}
+		}
+		else if (strncmp(buf, "<updatetracker", strlen("<updatetracker")) == 0)
+		{
+			if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
+			{
+				perror( "Error: socket failed" );
+				exit( 1 );
+			}
+			if (connect( server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr) ) == -1 )
+			{
+				perror( "Error: Connection Issue" );
+				exit(1);
+			}
+		
+			write(server_sock, buf, strlen(buf));
+			memset(buf, '\0', sizeof(buf));
+			while((sent = read(server_sock, buf, sizeof(buf))) > 0)
+			{
+				printf("%s", buf);
+			}
+			printf("\n");
+		}
+		else if (strncmp(buf, "<GET", strlen("<GET")) == 0)
+		{
+			FILE *file;
+			char tokenize[CHUNK_SIZE];
+			char *line;
+			if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
+			{
+				perror( "Error: socket failed" );
+				exit( 1 );
+			}
+			if (connect( server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr) ) == -1 )
+			{
+				perror( "Error: Connection Issue" );
+				exit(1);
+			}
+		
+			write(server_sock, buf, strlen(buf));
+			
+			strcpy(tokenize, buf);
+			/*Get the tracker filename*/
+			line = strtok(tokenize, " ");
+			line  = strtok(NULL, ">");
+			strcpy(buf, line);
+			
+			if (access(buf, F_OK) != 0)
+			{
+				file = fopen(buf, "wb");
+
+				memset(buf, '\0', sizeof(buf));
+				while((sent = read(server_sock, buf, sizeof(buf))) > 0)
+				{
+					fwrite(buf, sizeof(char), strlen(buf), file);
+					memset(buf, '\0', sizeof(buf));
+				}
+				
+				fclose(file);
+				
+				//spin off download thread.
+			}
+			else
+			{
+				printf("You already have this tracker file!\n");
+			}
+		}
+	}
+
+	close(server_sock); //close the socket
+
+	return (0);
+}
+
+void *client_handler(void * index)
+{
+	/* Dereference the index passed as a parameter by the pthread_create() function */
+	int client_index = *((int *) index);
+	
+	/******************************
+	 ******************************
+	 *             SHARE FILE HERE           *
+	 *   PEER SHOULD SND MESSAGE    *
+	 *   SAYING WHAT FILE IT WANTS   *  //Is this how we should do this?
+	 ******************************
+	 ******************************/
+	
+	/*When we're done sharing*/
+	if (close(peers[client_index].m_peer_socket) != 0)
+	{
+		perror("Closing socket issue");
+	}
+	if (pthread_cancel(peers[client_index].m_thread) != 0)
+	{
+		perror("Ending thread issue");
+		exit(1);
+	}
+	
+	return;
+}
+
+void *seed(void * param)
+{
+	/* We should pass a parameter in when executeing ./client.out to signify which port we'll be using */
+	struct sockaddr_in server_addr = {AF_INET, htons( SERVER_PORT +1 )}; //Here
+	struct sockaddr_in client_addr = {AF_INET};
+	int length = sizeof(client_addr);
+	
+	if ((seed_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+	{
+		perror("Server Error: Socket Failed");
+		exit(1);
+	}
+	
+	/* Variable needed for setsokopt call */
+	int setsock = 1;
+	if(setsockopt(seed_sock, SOL_SOCKET, SO_REUSEADDR, &setsock, sizeof(setsock)) == -1)
+	{
+		perror("Server Error: Setsockopt failed");
+		exit(1);
+	}
+	
+	if (bind(seed_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1 )
+	{
+		perror("Server Error: Bind Failed");
+		exit(1);
+	}
+	
+	if (listen(seed_sock, MAX_CLIENT) == -1)
+	{
+		perror("Server Error: Listen failed");
+		exit(1);
+	}
+	
+	setUpPeerArray();
+	
+	while (1)
+	{
+		int peer_array_index;
+		/* The server searches for an opening in the client array. If the array is full, -1 is returned */
+		if ((peer_array_index = findPeerArrayOpening()) != -1)
+		{
+			/* Accept the client, and store it's socket ID in the clients array. */
+			if ((peers[peer_array_index].m_peer_socket = accept(seed_sock, (struct sockaddr*)&client_addr, &length)) == -1)
+			{
+				perror("Server Error: Accepting issue"); 
+				exit(1);
+			}
+			else
+			{
+				printf("Peer has connected.\n");
+				/* Spin off a thread to process the peer. The peer's index in the clients array is passed as a 
+				 * parameter to indicate which peer is being processed. */
+				if (pthread_create(&(peers[peer_array_index].m_thread), NULL, &client_handler, &(peers[peer_array_index].m_index)) != 0)
+				{
+					printf("Error Creating Thread\n");
+					exit(1);
+				}
+			}
+		}
+	}
+	
+	if (close(seed_sock) != 0)
+	{
+		perror("Closing socket issue");
+	}
+	if (pthread_cancel(main_seed_thread) != 0)
+	{
+		perror("Ending thread issue");
+		exit(1);
+	}
+	
+	return;
+}
+
+void setUpPeerArray()
+{
+	int index;
+	for (index = 0; index < MAX_CLIENT; index++)
+	{
+		/* Set each m_index = to it's index in the array.  */
+		peers[index].m_index = index;
+		/* A m_socet value of -1 indicates that this element of the array is not being used. */
+		peers[index].m_peer_socket = -1;
+	}
+	return;
+}
+
+int findPeerArrayOpening()
+{
+	int index;
+	/* Check each element of the peers array, until we find an opening. */
+	for (index = 0; index < MAX_CLIENT; index++)
+	{
+		/* Once an opening is found, immediately leave the function. */
+		if (peers[index].m_peer_socket == -1)
+		{
+			return index;
+		}
+	}
+	return -1;
+}
+
 
 int findCommand()
 {
@@ -32,7 +331,7 @@ int findCommand()
 	char* isThisYourCmd[15];
 	printf("1\n");
 	char* createTracker = "<createtracker";
-	printf("2\n")
+	printf("2\n");
 	isThisYourCmd[0] = createTracker;
 
     printf("Bleh");
@@ -67,191 +366,4 @@ void findIP()
             strcpy(ip, ifa->ifa_name);
         }
     }
-}
-
-int main()
-{
-	//Specifies address: Where we are connecting our socket.
-	struct sockaddr_in server_addr = { AF_INET, htons( SERVER_PORT ) };
-	struct hostent *hp;
-
-    printf("Please input server address: ");
-	//Example host name: rc01xcs213.managed.mst.edu
-	//printf("Please Enter the Server You Would Like to Connect To\n");
-	//scanf("%s", buf); //read the server address from the keyboard
-	fgets(buf, CHUNK_SIZE, stdin);
-
-	//strcpy(buf, "rc01xcs213");
-
-	/* Get host via the server address entered by user into buf*/
-	if((hp = gethostbyname("rc01xcs213")) == NULL)
-	{
-		printf("Error: Unknown Host");
-		exit(1);
-	}
-
-	bcopy( hp->h_addr_list[0], (char*)&server_addr.sin_addr, hp->h_length );
-
-	/* create a socket */
-	/* internet stream socket, TCP */
-	if( ( sd = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
-    {
-		perror( "Error: socket failed" );
-		exit( 1 );
-	}
-
-	/*connect to the socket */
-	/* now when we need to communicate to the server, we do it over "sd" */
-	if (connect( sd, (struct sockaddr*)&server_addr, sizeof(server_addr) ) == -1 )
-	{
-		perror( "Error: Connection Issue" );
-		exit(1);
-	}
-
-    findCommand();
-	findIP(); //Sets 'ip' with char* representation of address
-
-	int sent;
-	//memset(buf, '\0', sizeof(buf));
-	if (strncmp(buf, "<REQ LIST>", strlen("<REQ LIST>")) == 0)
-	{
-		write(sd, "<REQ LIST>", strlen("<REQ LIST>"));
-		memset(buf, '\0', sizeof(buf));
-		while((sent = read(sd, buf, sizeof(buf))) > 0)
-		{
-			printf("%s", buf);
-			memset(buf, '\0', sizeof(buf));
-		}
-	}
-	else if (strncmp(buf, "<createtracker", strlen("<createtracker")) == 0)
-	{
-		write(sd, buf, strlen(buf));
-		memset(buf, '\0', sizeof(buf));
-		while((sent = read(sd, buf, sizeof(buf))) > 0)
-		{
-			printf("%s", buf);
-		}
-	}
-	else if (strncmp(buf, "<updatetracker", strlen("<updatetracker")) == 0)
-	{
-		write(sd, buf, strlen(buf));
-		memset(buf, '\0', sizeof(buf));
-		while((sent = read(sd, buf, sizeof(buf))) > 0)
-		{
-			printf("%s", buf);
-		}
-		printf("\n");
-	}
-	else if (strncmp(buf, "<GET", strlen("<GET")) == 0)
-	{
-		write(sd, buf, strlen(buf));
-
-		file = fopen("dog.jpg", "wb");
-		/*while(read(sd, buf, sizeof(buf)) > 0)
-		{
-			printf("%s", buf);
-		}*/
-
-		memset(buf, '\0', sizeof(buf));
-		while((sent = read(sd, buf, sizeof(buf))) > 0)
-		{
-			fwrite(buf, sizeof(char), sent, file);
-			memset(buf, '\0', sizeof(buf));
-		}
-		/*
-			printf("%s\n", buf);
-
-			save = strstr(buf, "<REP GET END");
-			if(save!= NULL);
-			{
-				printf("123");
-				printf("%s\n", save);
-			}
-
-			memset(buf, '\0', sizeof(buf));
-		}
-		memset(buf, '\0', sizeof(buf));
-
-		rewind(temp);
-		track = fopen("temp.track", "w");
-
-		size_t len = 0;
-		char *line = NULL;
-		getline(&line, &len, temp); //ignore the first line
-		int counter = 0;
-		int read_size;
-		while(counter < 20)
-		{
-			counter = counter + 1;
-			getline(&line, &len, temp);
-			if(strncmp(line, "<REP GET END", strlen("<REP GET END")) == 0)
-			{
-				//TODO md5
-				printf("stopped at line %d\n", counter);
-				break;
-			}
-			//printf("%s\n", line);
-			fwrite(line, sizeof(char), strlen(line), track);
-		}
-		binary = fopen("temp.bin", "w");
-		while( read_size = fread( buf, sizeof(char), sizeof(buf), temp ) )
-		{
-			fwrite(buf, sizeof(char), read_size, binary);
-		}
-
-		fclose(temp);
-		fclose(binary);
-		fclose(track);
-
-		*/
-		fclose(file);
-
-	}
-
-	//write(sd, "<createtracker test2 10 test_description md5 101.101 100>", strlen("<createtracker test2 10 test_description md5 101.101 100>"));
-	//write(sd, "<GET dog.track>", strlen("<GET dog.track>"));
-	//write(sd, "<updatetracker test 0 100 202.202 200>\n", strlen("<updatetracker test 0 100 202.202 200>\n"));
-
-	///Delete me
-	/*
-	if((file = fopen("dog.jpg", "wb")) == NULL) //w for write, b for binary
-	{
-		printf("Error writing new file\n");
-		exit(1);
-	}
-	memset(buf, '\0', sizeof(buf));
-
-	while((sent = read(sd, buf, sizeof(buf))) > 0)
-	{
-		fwrite(buf, sizeof(char), sent, file);
-		memset(buf, '\0', sizeof(buf));
-	}
-	*/
-	/*
-
-	//Creates a file to be written to. "Recieve.txt" should be replaced with the actual name of the file
-	if((file = fopen("dog2.jpg", "wb")) == NULL) //w for write, b for binary
-	{
-		printf("Error writing new file\n");
-		exit(1);
-	}
-
-	//Clear the buffer
-	memset(buf, '\0', sizeof(buf));
-
-	//This should permit continuous reading. As long as someone is sending, the client will continue reading
-	int sent;
-	while((sent = read(sd, buf, sizeof(buf))) > 0)
-	{
-		//Instead of writing the entire buffer, we only write the bits that were sent. This prevents us from writing any garbage data.
-		fwrite(buf, sizeof(char), sent, file);
-		memset(buf, '\0', sizeof(buf)); //reclear the buffer, so we don't accidently send some tailing data.
-	}
-
-
-	fclose(file); //close the file
-	*/
-	close(sd); //close the socket
-
-	return (0);
 }
