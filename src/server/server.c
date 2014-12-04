@@ -36,7 +36,7 @@
 /**
  * Socket variable for hosting the server. Server listens for connections.
  */
-int sock;
+int sock, port_num, thread_count;
 
 /**
  * Represents a peer (client) application.
@@ -91,6 +91,20 @@ int findClientArrayOpening();
  */
 int main(int argc, const char* argv[])
 {
+	switch(argc) 
+	{
+		case 2:
+			port_num = atoi(argv[1]);
+			printf("Port Num: %d\n", port_num);
+			break;
+		case 3:
+			port_num = atoi(argv[1]);
+			printf("Port Num: %d\n", port_num);
+			thread_count = atoi(argv[2]);
+			printf("Number of threads: %d\n", thread_count);
+			break;
+	}
+
 	struct sockaddr_in server_addr = {AF_INET, htons( SERVER_PORT )};
 	struct sockaddr_in client_addr = {AF_INET};
 	/* The length of socketaddr structure */
@@ -570,3 +584,4 @@ int findClientArrayOpening()
 	}
 	return -1;
 }
+					 
