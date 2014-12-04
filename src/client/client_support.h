@@ -158,26 +158,6 @@ int commitPendingChunks( char* tracker_file_name );
  */
 int appendChunk( struct chunks_struct test_chunk );
 
-
-/**
- * Update tracker file with current content in \b live_chunks vector.
- * Populate \b live_chunks & \b tracked_file_info vector with chunks & file information before calling this function.
- *
- * @return \b NO_ERROR
- */
-int createTracker();
-
-
-/**
- * Initialize \b live_chunks vector for createTracker().
- * Commits all chunks in \b pending_chunks vector to \b live_chunks vector to get ready for
- * createTracker() creating new tracker file.
- * \b live_chunks vector will be cleared and repopulated, \b pending_chunks vector will be cleared.
- * 
- */
-void initialTrackerChunks();
-
-
 /**
  * Clear \b pending_chunks vector.
  * 
@@ -193,11 +173,35 @@ void clearLiveChunks();
 
 
 /**
- * Determine if a chunk is being shared
+ * Determine if a chunk is being shared.
  * Determine if a chunk is being shared ( is it in \b live_chunks vector ? )
  *
  * @return Index of the chunk in live_chunks vector if found, \b NOT_LIVE_CHUNK if not.
  */
 int isLiveChunk( struct chunks_struct test_chunk );
+
+/**
+ * Append chunks to existing tracker file.
+ * Append chunks until segment is 5% filesize starting from \b start_byte to tracker file.
+ * Tracker file must have been initialized with header before calling this function.
+ * 
+ * @param tracker_filename Filename -> tracker file, INPUT
+ * @param filesize Filesize in bytes -> tracker file, INPUT
+ * @param start_byte Starting byte of the segment to be appended -> tracker file, INPUT
+ * 
+ * @return Ending byte of the segment.
+ */
+long appendToTracker( char* tracker_filename, long filesize, long start_byte );
+
+/**
+ * Generate filename with path.
+ * Generate filename with corresponding pathing with respect to the client index per 
+ * demo requirement.
+ * 
+ * @param client_index Client index for constructing corresponding file path, INPUT
+ * @param myfilefilename Buffer to hold the constructed filename with corresponding path string, OUTPUT
+ * 
+ */
+void myFile( int client_index, char* myfile );
 
 #endif
