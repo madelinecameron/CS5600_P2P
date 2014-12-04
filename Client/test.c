@@ -82,6 +82,7 @@ int main()
 		printf( "[TEST] Testing createNewTracker() \n\r" );
 		char dog_file[] = "dog.jpg";
 		char dog_track[] = "dog.jpg.track";
+		long start_pos = 0;
 		
 		test_file_h = fopen( dog_file, "r" );
 		fseek( test_file_h, 0, SEEK_END ); 				// seek to end of file
@@ -91,9 +92,12 @@ int main()
 		
 		printf( "[TEST] Testing file: \"%s\" with filesize = %ld\n", dog_file, dog_size );
 		
-		long l_test_rtn = appendToTracker( dog_track, dog_size, 0 );
-		printf( "[TEST] Ending byte of this segment: %ld\n", l_test_rtn );
-		
+		for(int n=0; n<15; n++ )
+		{
+			long l_test_rtn = appendToTracker( dog_track, dog_size, start_pos );
+			printf( "[TEST] Ending byte of this segment: %ld\n", l_test_rtn );
+			start_pos = l_test_rtn+1;
+		}
 		printf( "[TEST] Testing DONE!\n\n" );
 	}
 

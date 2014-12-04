@@ -45,7 +45,7 @@ int tracker_file_parser( char* tracker_file_name, char* filename, long filesize,
 	char *line;									///< Line buffer
 	char *pch;									///< \c strtok buffer
 	char temp_line[ DESCRIPTION_SIZE ];			///< Temp line buffer to be strtok-ed
-	char temp;									///< Temp char buffer 
+	char temp;									///< Temp char buffer
 	size_t len = 0;								///< Line length buffer
 	
 	/** Open tracker file using tracker_file_name, read-only mode */
@@ -359,7 +359,7 @@ void clearLiveChunks()
 long appendToTracker( char* tracker_filename, long filesize, long start_byte )
 {
 	/** Calculate segment size of 5% of the file */
-	long segment_size = filesize;
+	long segment_size = filesize/20;
 	
 	segment_size = ( ( filesize - start_byte ) < segment_size ) ? ( filesize - start_byte ) : segment_size;
 	
@@ -369,7 +369,7 @@ long appendToTracker( char* tracker_filename, long filesize, long start_byte )
 	num_of_chunks = ( segment_size%CHUNK_SIZE > 0 ) ? num_of_chunks+1 : num_of_chunks;
 	
 	/** Initilize start & end byte counter for chunk */
-	long start = start_byte, end = start_byte + CHUNK_SIZE-1;
+	long start = start_byte, end = start_byte + CHUNK_SIZE-1, end_seg;
 	
 	end = ( end > filesize ) ? filesize : end;
 	
@@ -381,7 +381,7 @@ long appendToTracker( char* tracker_filename, long filesize, long start_byte )
 	
 	if( TEST_MODE == 1 )
 	{
-		printf( "\r[DEBUG] Total chunk = %ld\n", num_of_chunks );
+		printf( "\r[DEBUG] %ld chunks in this segment\n", num_of_chunks );
 	}
 	
 	for( long n=0; n<num_of_chunks; n++ )
@@ -390,6 +390,7 @@ long appendToTracker( char* tracker_filename, long filesize, long start_byte )
 		chunk.end_byte = end;
 		
 		appendChunk( chunk );
+		end_seg = end;
 		
 		if( TEST_MODE == 1 )
 		{
@@ -402,6 +403,6 @@ long appendToTracker( char* tracker_filename, long filesize, long start_byte )
 	int rtn = commitPendingChunks( tracker_filename );
 	printf( "[DEBUG] commitPendingChunk() returned %d\n", rtn );
 	
-	return end;
+	return end_seg;
 }
 
