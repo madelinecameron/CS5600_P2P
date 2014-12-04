@@ -408,7 +408,6 @@ void readConfig()
 		CHUNK_SIZE = 512;
 		return;
 	}
-
     int lineCount = 0;
 	while((read = getline(&line, &length, configFile)) != -1)
 	{
@@ -429,6 +428,5 @@ void readConfig()
         }
         lineCount++;
 	}
-
 	fclose(configFile);
 }
