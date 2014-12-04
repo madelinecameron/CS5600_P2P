@@ -1,4 +1,14 @@
-/* gcc client.c -o client -lnsl -pthread */
+/**
+ * @file client.c
+ * @authors Matthew Lindner, Xiao Deng, Madeline Cameron
+ *
+ * @brief Multi-threaded client that updates server with tracker file and downloads chunks from other clients
+ * @details Multi-threaded client that uses separate threads to seed and download chunks to / from other clients.
+ *
+ * @section COMPILE
+ * gcc client.c -o client -lnsl -pthread
+ */
+
 #define _GNU_SOURCE //Used for findIP()
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +49,7 @@ void *seed(void * param);
 
 int findCommand();
 void findIP();
+void readConfig();
 
 //Buffer used to send/receive. Data is loaded into buffer (see read() and fwrite()).
 char buf[1024]; //Cannot be variably declared
@@ -46,9 +57,9 @@ char* ip;
 
 int main(int argc, const char* argv[])
 {
-	printf("Reading config file...");
+	printf("Reading config file...\n");
 	readConfig();
-
+    
     peers = malloc(sizeof(peer) * MAX_NUM_CLIENT);
     if(!peers) //Mem allocation failed!
     {
@@ -57,7 +68,7 @@ int main(int argc, const char* argv[])
 
     memset(peers, 0, sizeof(peer) * MAX_NUM_CLIENT);
 
-//Specifies address: Where we are connecting our socket.
+    //Specifies address: Where we are connecting our socket.
 	struct sockaddr_in server_addr = { AF_INET, htons( SERVER_PORT ) };
 	struct hostent *hp;
 
@@ -69,14 +80,6 @@ int main(int argc, const char* argv[])
 
 	bcopy( hp->h_addr_list[0], (char*)&server_addr.sin_addr, hp->h_length );
 
-	/*
-    findCommand();
-	findIP(); //Sets 'ip' with char* representation of address
-	*/
-	
-	
-	
-	
 	//IF MODE == SEED
 	/* Spin off a seed thread */
 	/* TAKE THE CONTENTS OF THE SEED FUNCTION, PUT IT HERE
@@ -89,14 +92,14 @@ int main(int argc, const char* argv[])
 		exit(1);
 	}
 	*/
-	
-	
+
+
 	//IF MODE == DOWNLOAD
 	int sent;
 	while (1)
 	{
 		fgets(buf, sizeof(buf), stdin);
-		
+
 		if (strncmp(buf, "<REQ LIST>", strlen("<REQ LIST>")) == 0)
 		{
 			/* create a socket */
@@ -114,7 +117,7 @@ int main(int argc, const char* argv[])
 				perror( "Error: Connection Issue" );
 				exit(1);
 			}
-		
+
 			write(server_sock, "<REQ LIST>", strlen("<REQ LIST>"));
 			memset(buf, '\0', sizeof(buf));
 			while((sent = read(server_sock, buf, sizeof(buf))) > 0)
@@ -124,7 +127,7 @@ int main(int argc, const char* argv[])
 			}
 		}
 		else if (strncmp(buf, "<createtracker", strlen("<createtracker")) == 0)
-		{		
+		{
 			if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
 			{
 				perror( "Error: socket failed" );
@@ -135,7 +138,7 @@ int main(int argc, const char* argv[])
 				perror( "Error: Connection Issue" );
 				exit(1);
 			}
-			
+
 			while((sent = read(server_sock, buf, sizeof(buf))) > 0)
 			{
 				printf("%s", buf);
@@ -153,7 +156,7 @@ int main(int argc, const char* argv[])
 				perror( "Error: Connection Issue" );
 				exit(1);
 			}
-		
+
 			write(server_sock, buf, strlen(buf));
 			memset(buf, '\0', sizeof(buf));
 			while((sent = read(server_sock, buf, sizeof(buf))) > 0)
@@ -177,15 +180,15 @@ int main(int argc, const char* argv[])
 				perror( "Error: Connection Issue" );
 				exit(1);
 			}
-		
+
 			write(server_sock, buf, strlen(buf));
-			
+
 			strcpy(tokenize, buf);
 			/*Get the tracker filename*/
 			line = strtok(tokenize, " ");
 			line  = strtok(NULL, ">");
 			strcpy(filename, line);
-			
+
 			if (access(filename, F_OK) != 0)
 			{
 				file = fopen(filename, "wb");
@@ -196,9 +199,9 @@ int main(int argc, const char* argv[])
 					fwrite(buf, sizeof(char), strlen(buf), file);
 					memset(buf, '\0', sizeof(buf));
 				}
-				
+
 				fclose(file);
-				
+
 				//spin off download thread.
 			}
 			else
@@ -217,7 +220,7 @@ void *client_handler(void * index)
 {
 	/* Dereference the index passed as a parameter by the pthread_create() function */
 	int client_index = *((int *) index);
-	
+
 	/******************************
 	 ******************************
 	 *             SHARE FILE HERE           *
@@ -225,10 +228,10 @@ void *client_handler(void * index)
 	 *   SAYING WHAT FILE IT WANTS   *  //Is this how we should do this?
 	 ******************************
 	 ******************************/
-	 
+
 	 //UPDATE TRACKER EVERY 10 SECONDS
-	 
-	
+
+
 	/*When we're done sharing*/
 	if (close(peers[client_index].m_peer_socket) != 0)
 	{
@@ -239,7 +242,7 @@ void *client_handler(void * index)
 		perror("Ending thread issue");
 		exit(1);
 	}
-	
+
 	return;
 }
 
@@ -249,13 +252,13 @@ void *seed(void * param)
 	struct sockaddr_in server_addr = {AF_INET, htons( SERVER_PORT +1 )}; //Here
 	struct sockaddr_in client_addr = {AF_INET};
 	int length = sizeof(client_addr);
-	
+
 	if ((seed_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 	{
 		perror("Server Error: Socket Failed");
 		exit(1);
 	}
-	
+
 	/* Variable needed for setsokopt call */
 	int setsock = 1;
 	if(setsockopt(seed_sock, SOL_SOCKET, SO_REUSEADDR, &setsock, sizeof(setsock)) == -1)
@@ -263,21 +266,21 @@ void *seed(void * param)
 		perror("Server Error: Setsockopt failed");
 		exit(1);
 	}
-	
+
 	if (bind(seed_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1 )
 	{
 		perror("Server Error: Bind Failed");
 		exit(1);
 	}
-	
-	if (listen(seed_sock, MAX_CLIENT) == -1)
+
+	if (listen(seed_sock, MAX_NUM_CLIENT) == -1)
 	{
 		perror("Server Error: Listen failed");
 		exit(1);
 	}
-	
+
 	setUpPeerArray();
-	
+
 	while (1)
 	{
 		int peer_array_index;
@@ -287,13 +290,13 @@ void *seed(void * param)
 			/* Accept the client, and store it's socket ID in the clients array. */
 			if ((peers[peer_array_index].m_peer_socket = accept(seed_sock, (struct sockaddr*)&client_addr, &length)) == -1)
 			{
-				perror("Server Error: Accepting issue"); 
+				perror("Server Error: Accepting issue");
 				exit(1);
 			}
 			else
 			{
 				printf("Peer has connected.\n");
-				/* Spin off a thread to process the peer. The peer's index in the clients array is passed as a 
+				/* Spin off a thread to process the peer. The peer's index in the clients array is passed as a
 				 * parameter to indicate which peer is being processed. */
 				if (pthread_create(&(peers[peer_array_index].m_thread), NULL, &client_handler, &(peers[peer_array_index].m_index)) != 0)
 				{
@@ -303,7 +306,7 @@ void *seed(void * param)
 			}
 		}
 	}
-	
+
 	if (close(seed_sock) != 0)
 	{
 		perror("Closing socket issue");
@@ -313,7 +316,7 @@ void *seed(void * param)
 		perror("Ending thread issue");
 		exit(1);
 	}
-	
+
 	return;
 }
 
@@ -324,7 +327,7 @@ void setUpPeerArray()
 	{
 		/* Set each m_index = to it's index in the array.  */
 		peers[index].m_index = index;
-		/* A m_socet value of -1 indicates that this element of the array is not being used. */
+		/* A m_socket value of -1 indicates that this element of the array is not being used. */
 		peers[index].m_peer_socket = -1;
 	}
 	return;
@@ -392,23 +395,41 @@ void findIP()
 void readConfig()
 {
 	char* line;
-	size_t length;
+	size_t length = 0;
 	ssize_t read;
-	FILE* configFile = fopen("./server.conf", "r");
+	FILE* configFile = fopen("client.conf", "r");
 
-	if(config == NULL)
+	if(configFile == NULL)
 	{
-		printf("Server config file doesn't exist! Reverting to default options!\n");
+		printf("Client config file doesn't exist! Reverting to default options!\n");
 		SERVER_PORT = 63122;
 		SEED_PORT = 63123;
 		MAX_NUM_CLIENT = 10;
 		CHUNK_SIZE = 512;
-		return 0;
+		return;
 	}
 
+    int lineCount = 0;
 	while((read = getline(&line, &length, configFile)) != -1)
 	{
-		printf(line);
+        
+        switch(lineCount) 
+        {
+            case 0:
+                SERVER_PORT = atoi(line);
+                break;
+            case 1:
+                SEED_PORT = atoi(line);
+                break;
+            case 2:
+                MAX_NUM_CLIENT = atoi(line);
+                break;
+            case 3:
+                CHUNK_SIZE = atoi(line);
+                break;
+        }
+        lineCount++;
+		printf("%d\n", atoi(line));
 	}
 
 	fclose(configFile);
