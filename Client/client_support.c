@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <vector>
 
 #include "client_support.h"
@@ -288,58 +289,7 @@ int commitPendingChunks( char* tracker_file_name )
 	return NO_ERROR;
 }
 
-
-int createTracker()
-{
-	char tracker_file_name[ FILENAME_SIZE ];		///< Tracker file name buffer
-	
-	/** If tracked file info struct is un-initialized, return \b INVALID_TRACKER_INFO */
-	if( tracked_file_info.filename[0] == '\0' ) return INVALID_TRACKER_INFO;
-	/** Else generate tracker file name using tracked file name */
-	else
-	{
-		char tracker_file_ext[] = ".track";
-		strcpy( tracker_file_name, tracked_file_info.filename );
-		strcat( tracker_file_name, tracker_file_ext );
-	}
-	
-	/** Get live_chunks vector size */
-	int num_of_live_chunks = live_chunks.size();
-	/** If size is invalid, return INVALID_PENDING_CHUNK_TABLE */
-	if( num_of_live_chunks < 0 ) return INVALID_CHUNK_TABLE;
-	
-	FILE* tracker_file_h;		///< File handle for tracker file
-	/** Create tracker file */
-	tracker_file_h = fopen( tracker_file_name, "w" );
-	
-	/** Write tracker file header info */
-	fprintf( tracker_file_h, "Filename: %s\nFilesize: %ld\nDescription: %s\nMD5: %s\n#test_comments",
-				tracked_file_info.filename,
-				tracked_file_info.filesize,
-				tracked_file_info.description,
-				tracked_file_info.md5
-				);
-	
-	/** Write chunks info for all chunks in live_chunks vector */
-	for( int n=0; n< num_of_live_chunks; n++ )
-	{
-		fprintf( tracker_file_h, "\r\n%s:%d:%ld:%ld:%ld",
-				live_chunks[n].ip_addr,
-				live_chunks[n].port_num,
-				live_chunks[n].start_byte,
-				live_chunks[n].end_byte,
-				live_chunks[n].time_stamp
-				);
-	}
-	
-	/** Close tracker file handle */
-	fclose( tracker_file_h );
-	/** Return normal */
-	return NO_ERROR;
-}
-
-
-void initialTrackerChunks()
+void initLiveChunks()
 {
 	/** Get pending_chunks vector size */
 	int num_of_pending_chunks = pending_chunks.size();
@@ -404,3 +354,54 @@ void clearLiveChunks()
 	/** Invoke vector clear for live_chunks */
 	live_chunks.clear();
 }
+
+
+long appendToTracker( char* tracker_filename, long filesize, long start_byte )
+{
+	/** Calculate segment size of 5% of the file */
+	long segment_size = filesize;
+	
+	segment_size = ( ( filesize - start_byte ) < segment_size ) ? ( filesize - start_byte ) : segment_size;
+	
+	/** Calculate number of chunks in the segment, rounded down */
+	long num_of_chunks = segment_size/CHUNK_SIZE;
+	
+	num_of_chunks = ( segment_size%CHUNK_SIZE > 0 ) ? num_of_chunks+1 : num_of_chunks;
+	
+	/** Initilize start & end byte counter for chunk */
+	long start = start_byte, end = start_byte + CHUNK_SIZE-1;
+	
+	end = ( end > filesize ) ? filesize : end;
+	
+	chunks_struct chunk;
+	long current_time = ( unsigned ) time( NULL );
+	chunk.time_stamp = current_time;
+	strcpy( chunk.ip_addr, "localhost" );
+	chunk.port_num = test_port_num;
+	
+	if( TEST_MODE == 1 )
+	{
+		printf( "\r[DEBUG] Total chunk = %ld\n", num_of_chunks );
+	}
+	
+	for( long n=0; n<num_of_chunks; n++ )
+	{
+		chunk.start_byte = start;
+		chunk.end_byte = end;
+		
+		appendChunk( chunk );
+		
+		if( TEST_MODE == 1 )
+		{
+			printf( "\r[DEBUG] Chunk[ %ld - %ld ] appended\n", start, end );
+		}
+		start = end+1;
+		end += CHUNK_SIZE;
+		end = ( end > filesize ) ? filesize : end;
+	}
+	int rtn = commitPendingChunks( tracker_filename );
+	printf( "[DEBUG] commitPendingChunk() returned %d\n", rtn );
+	
+	return end;
+}
+

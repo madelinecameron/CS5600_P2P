@@ -158,26 +158,6 @@ int commitPendingChunks( char* tracker_file_name );
  */
 int appendChunk( struct chunks_struct test_chunk );
 
-
-/**
- * Update tracker file with current content in \b live_chunks vector.
- * Populate \b live_chunks & \b tracked_file_info vector with chunks & file information before calling this function.
- *
- * @return \b NO_ERROR
- */
-int createTracker();
-
-
-/**
- * Initialize \b live_chunks vector for createTracker().
- * Commits all chunks in \b pending_chunks vector to \b live_chunks vector to get ready for
- * createTracker() creating new tracker file.
- * \b live_chunks vector will be cleared and repopulated, \b pending_chunks vector will be cleared.
- * 
- */
-void initialTrackerChunks();
-
-
 /**
  * Clear \b pending_chunks vector.
  * 
@@ -199,5 +179,9 @@ void clearLiveChunks();
  * @return Index of the chunk in live_chunks vector if found, \b NOT_LIVE_CHUNK if not.
  */
 int isLiveChunk( struct chunks_struct test_chunk );
+
+
+long appendToTracker( char* filename, long filesize, long start_byte );
+
 
 #endif

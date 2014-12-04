@@ -21,6 +21,9 @@ int main()
 {
 	//tracker file name for testing
 	char test_tracker_filename[] = "name.track";
+	
+	//test file handle
+	FILE* test_file_h;
 
 	//run tracker_file_parser()
 	tracker_file_parser( 	test_tracker_filename,
@@ -31,12 +34,7 @@ int main()
 							);
 
 	if( TEST_MODE == 1 )
-	{
-		char test_filename[ FILENAME_SIZE ] = "test_tracker.track";
-		char test_description[ DESCRIPTION_SIZE ] = "This_description_is_sick";
-		char test_md5[ MD5_SIZE ] = "FFA3B4F56AC712387CCBFE";
-		long test_filesize = 88899889;
-	
+	{	
 		long test_start = 1234567;
 		long test_end = 2345678;
 		long test_time_stamp = 1999999999;
@@ -74,23 +72,28 @@ int main()
 		}
 		else printf( "[TEST] No next chunk found\n" );
 	
-		printf( "[TEST] Testing createTracker() with 	filename = %s, filesize = %ld, \n					description = %s, md5 = %s\n\r",
-				test_filename,
-				test_filesize,
-				test_description,
-				test_md5
-				);
-	
-		//test createTracker()
-		createTracker();
-	
 		//test isLiveChunk()
 		printf( "[TEST] Testing isLiveChunk() \n\r" );
 		int test_rtn;
 		test_rtn = isLiveChunk( live_chunks[1] );
 		if( test_rtn != NOT_LIVE_CHUNK ) printf( "[TEST] test_chunk is live @ live_chunks[%d]!\n\r", test_rtn );
 		else printf( "[TEST] test_chunk is offline!\n\r" );
-	
+		
+		printf( "[TEST] Testing createNewTracker() \n\r" );
+		char dog_file[] = "dog.jpg";
+		char dog_track[] = "dog.jpg.track";
+		
+		test_file_h = fopen( dog_file, "r" );
+		fseek( test_file_h, 0, SEEK_END ); 				// seek to end of file
+		long dog_size = ftell( test_file_h ); 			// get current file pointer
+		fseek( test_file_h, 0, SEEK_SET ); 				// seek back to beginning of file
+		fclose( test_file_h );
+		
+		printf( "[TEST] Testing file: \"%s\" with filesize = %ld\n", dog_file, dog_size );
+		
+		long l_test_rtn = appendToTracker( dog_track, dog_size, 0 );
+		printf( "[TEST] Ending byte of this segment: %ld\n", l_test_rtn );
+		
 		printf( "[TEST] Testing DONE!\n\n" );
 	}
 
