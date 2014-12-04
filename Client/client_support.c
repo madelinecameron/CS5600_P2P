@@ -406,3 +406,8 @@ long appendToTracker( char* tracker_filename, long filesize, long start_byte )
 	return end_seg;
 }
 
+void myFile( int client_index, char* myfile )
+{
+	sprintf( myfile, "./test_clients/client_%d/picture-wallpaper.jpg", client_index );
+}
+

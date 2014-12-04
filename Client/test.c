@@ -34,7 +34,7 @@ int main()
 							);
 
 	if( TEST_MODE == 1 )
-	{	
+	{
 		long test_start = 1234567;
 		long test_end = 2345678;
 		long test_time_stamp = 1999999999;
@@ -98,6 +98,10 @@ int main()
 			printf( "[TEST] Ending byte of this segment: %ld\n", l_test_rtn );
 			start_pos = l_test_rtn+1;
 		}
+		
+		char myfile_name[40];
+		myFile( 1, myfile_name );
+		printf( "\r[TEST] Testing myFile() : %s\n", myfile_name );
 		printf( "[TEST] Testing DONE!\n\n" );
 	}
 

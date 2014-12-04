@@ -184,4 +184,6 @@ int isLiveChunk( struct chunks_struct test_chunk );
 long appendToTracker( char* filename, long filesize, long start_byte );
 
 
+void myFile( int client_index, char* myfile );
+
 #endif
