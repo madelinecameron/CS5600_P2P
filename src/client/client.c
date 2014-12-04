@@ -57,8 +57,8 @@ char* ip;
 
 int main(int argc, const char* argv[])
 {
-	printf("Reading config file...\n");
-	readConfig();
+    printf("Reading config file...\n");
+    readConfig();
     
     peers = malloc(sizeof(peer) * MAX_NUM_CLIENT);
     if(!peers) //Mem allocation failed!
@@ -412,7 +412,6 @@ void readConfig()
     int lineCount = 0;
 	while((read = getline(&line, &length, configFile)) != -1)
 	{
-        
         switch(lineCount) 
         {
             case 0:
@@ -429,7 +428,6 @@ void readConfig()
                 break;
         }
         lineCount++;
-		printf("%d\n", atoi(line));
 	}
 
 	fclose(configFile);
