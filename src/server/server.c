@@ -18,7 +18,6 @@
  * gcc server.c -o server.out -lnsl -pthread -lcrypto
  */
 
-#include "config.ini"
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -31,16 +30,32 @@
 #include <time.h>
 #include <dirent.h>
 #include <unistd.h>
+#include "config.ini"
 #include "compute_md5.h"
 
 /**
  * Socket variable for hosting the server. Server listens for connections.
  */
-int sock, port_num, thread_count;
+int sock;
+/**
+ * Port that the server will be running on.
+ */
+int server_port;
+/**
+ * The maximum number of connections the server can handle at once. Each connection is handled as a thread.
+ */
+int max_client;
+/**
+ * The size of data (in bytes) that will be read from clients/sent to clients.
+ */
+int chunk_size;
+
+int CLOSE_PROGRAM;
 
 /**
  * Represents a peer (client) application.
  * Each peer is handled with its own thread.
+ * Each peer has it's own: socket, index (in the clients array), buffer (for temporarily storing data), a file pointer, and a thread varaible.
  */
 struct peer
 {
@@ -60,6 +75,7 @@ struct peer clients[MAX_CLIENT];
 /**
  * Mutex used to prevent a file from being operated on by multiple threads at the same time.
  * Prevents the possibility of race-condition and dead-lock.
+ * Since we will only be using one mutex on the server, we can initialize the mutex statically.
  */
 pthread_mutex_t file_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -81,6 +97,14 @@ void setUpClientArray();
  * @return Index (0 - \a MAX_CLIENT -1) of the \a clients array where new client will be stored, -1 if array is full (server is currently serving the maximum amount of clients).
  */
 int findClientArrayOpening();
+/**
+ * Reads in \a server_port, \a max_client, and \a chunk_size (int that order) from a config file.
+ * If the config file cannot be opened, or is not found, these variables are given default values: 3456, 10, and 1024 respectful. 
+ */
+void readConfig();
+
+void signalhandler(int sig);
+
 
 /**
  * When server.out is executed, the server will listen for peers on a stream socket.
@@ -91,21 +115,25 @@ int findClientArrayOpening();
  */
 int main(int argc, const char* argv[])
 {
+	/** 
+	 * First checks to see if the server port number was passed in as a parameter.
+	 * If not, readConfig() is called, and a default value is assigned to server_port.
+	 */
 	switch(argc) 
 	{
 		case 2:
-			port_num = atoi(argv[1]);
-			printf("Port Num: %d\n", port_num);
+		{	
+			server_port = atoi(argv[1]);
 			break;
-		case 3:
-			port_num = atoi(argv[1]);
-			printf("Port Num: %d\n", port_num);
-			thread_count = atoi(argv[2]);
-			printf("Number of threads: %d\n", thread_count);
+		}
+		default:
+		{
+			readConfig();
 			break;
+		}
 	}
-
-	struct sockaddr_in server_addr = {AF_INET, htons( SERVER_PORT )};
+	
+	struct sockaddr_in server_addr = {AF_INET, htons( server_port )};
 	struct sockaddr_in client_addr = {AF_INET};
 	/* The length of socketaddr structure */
 	int length = sizeof(client_addr);
@@ -121,7 +149,6 @@ int main(int argc, const char* argv[])
 	
 	/* Variable needed for setsokopt call */
 	int setsock = 1;
-	
 	if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &setsock, sizeof(setsock)) == -1)
 	{
 		perror("Server Error: Setsockopt failed");
@@ -142,6 +169,9 @@ int main(int argc, const char* argv[])
 		exit(1);
 	}
 	
+	CLOSE_PROGRAM = 0;
+	signal(SIGINT, signalhandler);
+	
 	/** Initialize the client array so each element is marked as unused. */
 	setUpClientArray();
 	
@@ -149,7 +179,7 @@ int main(int argc, const char* argv[])
 	 * When a peer tries to connect, if the server is not at capacity, the peer will be placed in the \a clients array, and a thread will be spun off
 	 * to process that peer. If the server is already at full capacity, the peer will have to wait for an opening.
 	 */
-	while (1)
+	while (CLOSE_PROGRAM == 0)
 	{
 		int client_array_index;
 		/* The server searches for an opening in the client array. If the array is full, -1 is returned */
@@ -158,12 +188,15 @@ int main(int argc, const char* argv[])
 			/* Accept the client, and store it's socket ID in the clients array. */
 			if ((clients[client_array_index].m_peer_socket = accept(sock, (struct sockaddr*)&client_addr, &length)) == -1)
 			{
-				perror("Server Error: Accepting issue"); 
-				exit(1);
+				if (CLOSE_PROGRAM != 1)
+				{
+					perror("Server Error: Accepting issue"); 
+					exit(1);
+				}
 			}
 			else
 			{
-				printf("Client has connected.\n");
+				printf("A client has connected.\n");
 				/* Spin off a thread to process the peer. The peer's index in the clients array is passed as a 
 				 * parameter to indicate which peer is being processed. */
 				if (pthread_create(&(clients[client_array_index].m_thread), NULL, &client_handler, &(clients[client_array_index].m_index)) != 0)
@@ -175,6 +208,13 @@ int main(int argc, const char* argv[])
 		}
 	}
 	
+	
+	 int i;
+	 for (i = 0; i < MAX_CLIENT; i++)
+	 {
+		pthread_join(clients[i].m_thread, NULL);
+	 }
+	 
 	return 0;
 }
 	
@@ -480,12 +520,7 @@ void *client_handler(void * index)
 				{
 				
 					/* ADD ME BACK LATER
-					*
-					*
-					//write(clients[client_index].m_peer_socket, "<REP GET BEGIN>\n", strlen("<REP GET BEGIN>\n"));
-					*
-					*
-					*
+					//write(clients[client_index].m_peer_socket, "<REP GET BEGIN>\n", strlen("<REP GET BEGIN>\n"));					*
 					*/
 					
 					memset(clients[client_index].m_buf, '\0', sizeof(clients[client_index].m_buf));
@@ -503,20 +538,12 @@ void *client_handler(void * index)
 					
 					memset(clients[client_index].m_buf, '\0', sizeof(clients[client_index].m_buf));
 					/* ADD ME BACK LATER
-					*
-					*
 					sprintf(clients[client_index].m_buf, "\n<REP GET END %s>", md5_string);
-					*
-					*
 					*/
 					free(md5_string);
 					
 					/* ADD ME BACK LATER
-					*
-					*
 					write(clients[client_index].m_peer_socket, clients[client_index].m_buf, strlen(clients[client_index].m_buf));
-					*
-					*
 					*/
 				}
 				/** If the tracker file could not be opened, the server sends the peer a "GET invalid" protocol error message. */
@@ -562,10 +589,10 @@ void setUpClientArray()
 	int index;
 	for (index = 0; index < MAX_CLIENT; index++)
 	{
-		/* Set each m_index = to it's index in the array.  */
-		clients[index].m_index = index;
 		/* A m_socet value of -1 indicates that this element of the array is not being used. */
 		clients[index].m_peer_socket = -1;
+		/* Set each m_index = to it's index in the array.  */
+		clients[index].m_index = index;
 	}
 	return;
 }
@@ -584,4 +611,60 @@ int findClientArrayOpening()
 	}
 	return -1;
 }
-					 
+
+void readConfig()
+{
+ 	char* line;
+	size_t length = 0;
+	ssize_t read;
+	FILE* configFile;
+ 
+	if ((configFile = fopen("server.conf", "r")) != NULL)
+	{
+		int lineCount = 0;
+		while((read = getline(&line, &length, configFile)) != -1)
+		{
+			switch(lineCount) 
+			{
+				/** The first line of the config file contains the server port */
+				case 0:
+					server_port = atoi(line);
+					break;
+				/** The second line contains the max number of clients that the server can process at once.*/
+				case 1:
+					max_client = atoi(line);
+					break;
+				/** The third line contains the chunk size (in bytes) of the messages passed between the server and clients. */
+				case 2:
+					chunk_size = atoi(line);
+					break;
+			}
+			lineCount++;
+		}
+		fclose(configFile);
+	}
+	/** If a config file could not be opened, default values will be assigned:
+	 * server_port = 3456, 
+	 * max_client = 10, and 
+	 * chunk_size = 1024.
+	 */
+	else
+	{
+		server_port = 3456;
+ 		max_client = 10;
+ 		chunk_size = 1024;
+	}
+	
+	return;
+}
+
+void signalhandler(int sig)
+{
+	if(close(sock) != 0)
+	{
+		perror("Error closing server socket");
+	}
+	CLOSE_PROGRAM = 1;
+	
+	return;
+}
