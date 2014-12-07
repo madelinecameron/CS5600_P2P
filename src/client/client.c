@@ -80,6 +80,8 @@ int main(int argc, const char* argv[])
 	//Specifies address: Where we are connecting our socket.
 	struct sockaddr_in server_addr = { AF_INET, htons( SERVER_PORT ) };
 	struct hostent *hp;
+	
+	char buf[CHUNK_SIZE];
 
 	if((hp = gethostbyname("localhost")) == NULL)
 	{
@@ -93,105 +95,79 @@ int main(int argc, const char* argv[])
 	
 	if (mode == SEED)
 	{
-		/* We should pass a parameter in when executeing ./client.out to signify which port we'll be using */
-		struct sockaddr_in server_addr = {AF_INET, htons( seed_port )}; //Here
+		struct sockaddr_in server_addr = { AF_INET, htons( SERVER_PORT ) };
 		struct sockaddr_in client_addr = {AF_INET};
 		int length = sizeof(client_addr);
 		
-		if ((seed_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+		//try to create tracker....
+		if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
 		{
-			perror("Server Error: Socket Failed");
+			perror( "Error: socket failed" );
+			exit( 1 );
+		}
+
+		/*connect to the server */
+		/* now when we need to communicate to the server, we do it over "server_sock" */
+		if (connect( server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr) ) == -1 )
+		{
+			perror( "Error: Connection Issue" );
 			exit(1);
 		}
 		
-		/* Variable needed for setsokopt call */
-		int setsock = 1;
-		if(setsockopt(seed_sock, SOL_SOCKET, SO_REUSEADDR, &setsock, sizeof(setsock)) == -1)
+		memset(buf, '\0', sizeof(buf));
+		char *md5 = computeMD5("picture-wallpaper.jpg");
+		sprintf(buf, "<createtracker picture-wallpaper.jpg 35738 img %s localhost %d>", md5, seed_port); 
+		write(server_sock, buf , strlen(buf));
+		free(md5);
+		
+		/*if (pthread_create(&(peers[0].m_thread), NULL, &client_handler, &(client_i)) != 0)
 		{
-			perror("Server Error: Setsockopt failed");
+			printf("Error Creating Thread\n");
 			exit(1);
-		}
+		}*/
 		
-		fcntl(seed_sock, F_SETFL, O_NONBLOCK);
 		
-		if (bind(seed_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1 )
+		clock_t elapsed_time, start = clock();
+		int percentage = ((client_i == 1)? (0) : ((client_i * 20) -19));
+		int increment, segment_num = 0;
+		while (segment_num < 4)
 		{
-			perror("Server Error: Bind Failed");
-			exit(1);
-		}
-		
-		if (listen(seed_sock, MAX_CLIENT) == -1)
-		{
-			perror("Server Error: Listen failed");
-			exit(1);
-		}
-				
-		clock_t cur, start = clock();
-		int cur_chunk = ((client_i - 1)*20) + 1;
-		int count_to_4 = 0;
-		
-		if (client_i == 1)
-		{
-			cur_chunk--;
-		}
-		while (1)
-		{
-			int peer_array_index;
-			
-			/* The server searches for an opening in the client array. If the array is full, -1 is returned */
-			if ((peer_array_index = findPeerArrayOpening()) != -1)
+			elapsed_time = clock() - start;
+			if (((float)elapsed_time/CLOCKS_PER_SEC) >= 1)// if it's been 10 seconds
 			{
-				/* Accept the client, and store it's socket ID in the clients array. */
-				if ((peers[peer_array_index].m_peer_socket = accept(seed_sock, (struct sockaddr*)&client_addr, &length)) == -1)
+				if((server_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 				{
-					//perror("Server Error: Accepting issue"); 
-					//exit(1);
+					perror( "Error: socket failed" );
+					exit( 1 );
 				}
-				else
+				if (connect( server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr) ) == -1 )
 				{
-					printf("Peer has connected.\n");
-					/* Spin off a thread to process the peer. The peer's index in the clients array is passed as a 
-					 * parameter to indicate which peer is being processed. */
-					if (pthread_create(&(peers[peer_array_index].m_thread), NULL, &client_handler, &(peers[peer_array_index].m_index)) != 0)
-					{
-						printf("Error Creating Thread\n");
-						exit(1);
-					}
+					perror( "Error: Connection Issue" );
+					exit(1);
 				}
-			}
-			cur = clock() - start;
-			if ((((float)cur/CLOCKS_PER_SEC) >= 10) && count_to_4 < 4)// if it's been 10 seconds
-			{
-				int increment;
-				if (cur_chunk == 0)
-				{
-					increment = 5;
-				}
-				else
-				{
-					increment = 4;
-				}
+				increment = (percentage == 0)? (5) : (4);			
 				
-				printf("I am client_%d, and I am advertising the following chunk of the file: %d%% to %d%%.\n", client_i, cur_chunk, cur_chunk + increment);
+				printf("I am client_%d, and I am advertising the following chunk of the file: %d%% to %d%%.\n", client_i, percentage, percentage + increment);
 				
-				if(cur_chunk == 0)
-				{
-					cur_chunk++;
-				}
-				cur_chunk += 5;
-				count_to_4++;
+				///////////////////////////////////
+				///////////////////////////////////
+				///I'm not sure the best way to calc/get the start and end bytes here.
+				/////Should I just calculate the start and end bytes myself using (percentage * file size),
+				/////Or Should I call findNextChunk() ?
+				sprintf(buf, "<updatetracker picture-wallpaper.jpg %d %d localhost %d>", percentage /*start byte*/, percentage + increment /*end byte*/, seed_port);			
+				///////////////////////////////////
+				///////////////////////////////////
+				
+				write(server_sock, buf , strlen(buf));
+				
+				(percentage == 0)? (percentage+=6) : (percentage+=5);
+				segment_num++;
 				
 				start = clock();
 			}
 		}
-	
-		if (close(seed_sock) != 0)
-		{
-			perror("Closing socket issue");
-		}
 	}
 	
-	char buf[CHUNK_SIZE];
 	int sent;
 	if (mode == DOWNLOAD)
 	{
@@ -318,6 +294,13 @@ int main(int argc, const char* argv[])
 			}
 		}
 	}
+	
+	
+	int i;
+	for (i = 0; i < MAX_CLIENT; i++)
+	{
+		pthread_join(peers[i].m_thread, NULL);
+	}
 
 	close(server_sock); //close the socket
 
@@ -331,65 +314,88 @@ void *download(void * index)
 	// i = 1 -> second sub-chunk (21%->40%)
 	int client_index = *((int *) index);
 	
+	//find that chunk
+	//connect to client who has that chunk
+	//download it
+	//repeat
+	
+	
 	printf("%d\n", client_index);
-	
-	//mutex lock
-	//get first part of your segment
-	//get second part
-	//get third part
-	//get fourth part
-	//get fifth part
-	//mutex unlock
-	
+		
 	return;
 }
 
 void *client_handler(void * index)
 {
-	struct sockaddr_in server_addr = { AF_INET, htons( SERVER_PORT ) };
-	struct hostent *hp;
-
-	char buf[CHUNK_SIZE];
 	/* Dereference the index passed as a parameter by the pthread_create() function */
 	int client_index = *((int *) index);
 	
-	//create tracker
-	if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
+	struct sockaddr_in server_addr = { AF_INET, htons( seed_port ) };
+	struct sockaddr_in client_addr = {AF_INET};
+	/* The length of socketaddr structure */
+	int length = sizeof(client_addr);
+
+	char buf[CHUNK_SIZE];
+	
+	if((seed_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
 	{
 		perror( "Error: socket failed" );
 		exit( 1 );
 	}
-	/*connect to the server */
-	/* now when we need to communicate to the server, we do it over "server_sock" */
-	if (connect( server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr) ) == -1 )
+	
+	int setsock = 1;
+	if(setsockopt(seed_sock, SOL_SOCKET, SO_REUSEADDR, &setsock, sizeof(setsock)) == -1)
 	{
-		perror( "Error: Connection Issue" );
+		perror("Server Error: Setsockopt failed");
 		exit(1);
 	}
 	
-	//create tracker
-	//get md5
-	memset(buf, '\0', sizeof(buf));
-	char *md5 = computeMD5("picture-wallpaper.jpg");
-	sprintf(buf, "<createtracker picture 35738 img %s localhost %d", md5, seed_port); 
-	write(server_sock, buf , strlen(buf));
-	free(md5);
+	/** Bind the socket to an internet port. */
+	if (bind(seed_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1 )
+	{
+		perror("Server Error: Bind Failed");
+		exit(1);
+	}
 	
+	if (listen(seed_sock, MAX_CLIENT) == -1)
+	{
+		perror("Server Error: Listen failed");
+		exit(1);
+	}
 	
-	/******************************
-	 ******************************
-	 *      SHARE FILE HERE       *
-	 *   PEER SHOULD SND MESSAGE  *
-	 *  SAYING WHAT FILE IT WANTS *   
-	 ******************************
-	 ******************************/
-	 
+	//
+	//This will probably need to be in a loop, because they will accept 1 chunk at a time.....
+	//
+	//
+	if ((peers[0].m_peer_socket = accept(seed_sock, (struct sockaddr*)&client_addr, &length)) == -1)
+	{
+		perror("Server Error: Accepting issue"); 
+		exit(1);
+	}
+	else
+	{
+		printf("A downloading client has connected.\n");
+
+		/******************************
+		 ******************************
+		 *      SHARE FILE HERE       *
+		 *   PEER SHOULD SND MESSAGE  *
+		 *  SAYING WHAT CHUNKS IT WANTS *   
+		 ******************************
+		 ******************************/
+	}
+		
+	
 	/*When we're done sharing*/
-	if (close(peers[client_index].m_peer_socket) != 0)
+	if (close(peers[0].m_peer_socket) != 0)
 	{
 		perror("Closing socket issue");
 	}
-	if (pthread_cancel(peers[client_index].m_thread) != 0)
+	if (close(seed_sock) != 0)
+	{
+		perror("Closing socket issue");
+	}
+	if (pthread_cancel(peers[0].m_thread) != 0)
 	{
 		perror("Ending thread issue");
 		exit(1);
@@ -458,7 +464,7 @@ void readConfig()
 		fclose(configFile);
 	}
 	/** If a config file could not be opened, default values will be assigned:
-	 * server_port = 3457, 
+	 * server_port = 3456, 
 	 * max_client = 5, and 
 	 * chunk_size = 1024.
 	 */

@@ -314,7 +314,10 @@ void *client_handler(void * index)
 					memset(clients[client_index].m_buf, '\0', sizeof(clients[client_index].m_buf));
 					
 					/* Copy the tracker file contents into the buffer. */
-					sprintf(clients[client_index].m_buf, "Filename: %s\nFilesize: %s\nDescription: %s\nMD5: %s\n%s:%s:0:%s:%d", filename, filesize, description, md5, ip, port, filesize,  (unsigned)time(NULL));
+					
+					//sprintf(clients[client_index].m_buf, "Filename: %s\nFilesize: %s\nDescription: %s\nMD5: %s\n%s:%s:0:%s:%d", filename, filesize, description, md5, ip, port, filesize,  (unsigned)time(NULL));
+					sprintf(clients[client_index].m_buf, "Filename: %s\nFilesize: %s\nDescription: %s\nMD5: %s", filename, filesize, description, md5);
+					
 					/* Write the buffer contents to the new tracker file. */
 					fwrite(clients[client_index].m_buf, sizeof(char), strlen(clients[client_index].m_buf), clients[client_index].m_file);
 					/** Let the client know that the creation was successful with a "createtracker succ" protocol message. */
