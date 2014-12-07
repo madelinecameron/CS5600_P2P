@@ -120,7 +120,6 @@ int main(int argc, const char* argv[])
 		write(server_sock, buf , strlen(buf));
 		free(md5);
 		
-		//We'll un-comment this later....
 		/*if (pthread_create(&(peers[0].m_thread), NULL, &client_handler, &(client_i)) != 0)
 		{
 			printf("Error Creating Thread\n");
@@ -169,14 +168,27 @@ int main(int argc, const char* argv[])
 		}
 	}
 	
+	int foundPic = 0;
 	int sent;
 	if (mode == DOWNLOAD)
 	{
 		while (1)
 		{
-			fgets(buf, sizeof(buf), stdin);
+			if (foundPic == 1)
+			{
+				fgets(buf, sizeof(buf), stdin);
+			}
+			else
+			{
+				// wait 5 seconds
+				clock_t elapsed_time, start = clock();
+				do
+				{
+					elapsed_time = clock() - start;
+				} while (((float)elapsed_time/CLOCKS_PER_SEC) < 5);
+			}
 			
-			if (strncmp(buf, "<REQ LIST>", strlen("<REQ LIST>")) == 0)
+			if ((strncmp(buf, "<REQ LIST>", strlen("<REQ LIST>")) == 0) || foundPic == 0)
 			{
 				/* create a socket */
 				/* internet stream socket, TCP */
@@ -198,11 +210,21 @@ int main(int argc, const char* argv[])
 				memset(buf, '\0', sizeof(buf));
 				while((sent = read(server_sock, buf, sizeof(buf))) > 0)
 				{
+					if (strstr(buf, "picture-wallpaper.jpg") != NULL)
+					{
+						foundPic = 1;
+					}
 					printf("%s", buf);
 					memset(buf, '\0', sizeof(buf));
 				}
+				
+				if (foundPic == 1)
+				{
+					//Since buf now contains a <GET> statement, the <GET> command should be invoked below.
+					strcpy(buf, "<GET picture-wallpaper.jpg.track>");
+				}
 			}
-			else if (strncmp(buf, "<createtracker", strlen("<createtracker")) == 0)
+			if (strncmp(buf, "<createtracker", strlen("<createtracker")) == 0)
 			{		
 				if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
 				{
@@ -220,7 +242,7 @@ int main(int argc, const char* argv[])
 					printf("%s", buf);
 				}
 			}
-			else if (strncmp(buf, "<updatetracker", strlen("<updatetracker")) == 0)
+			if (strncmp(buf, "<updatetracker", strlen("<updatetracker")) == 0)
 			{
 				if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
 				{
@@ -241,7 +263,7 @@ int main(int argc, const char* argv[])
 				}
 				printf("\n");
 			}
-			else if (strncmp(buf, "<GET", strlen("<GET")) == 0)
+			if (strncmp(buf, "<GET", strlen("<GET")) == 0)
 			{
 				FILE *file;
 				char tokenize[CHUNK_SIZE], filename[CHUNK_SIZE];
@@ -293,6 +315,7 @@ int main(int argc, const char* argv[])
 					printf("You already have this tracker file!\n");
 				}
 			}
+			close(server_sock);
 		}
 	}
 	
@@ -302,8 +325,6 @@ int main(int argc, const char* argv[])
 	{
 		pthread_join(peers[i].m_thread, NULL);
 	}
-
-	close(server_sock); //close the socket
 
 	return 0;
 }

@@ -61,13 +61,12 @@ char * computeMD5(const char * filename)
 		{
 			sprintf(&md5String[i*2], "%02x", (unsigned int)md5_sum[i]);
 		}
+		return md5String;
 	}
 	else
 	{
-		md5String = NULL;
+		return NULL;
 	}
-	
-	return md5String;
 }
 
 #endif
