@@ -120,6 +120,7 @@ int main(int argc, const char* argv[])
 		write(server_sock, buf , strlen(buf));
 		free(md5);
 		
+		//We'll un-comment this later....
 		/*if (pthread_create(&(peers[0].m_thread), NULL, &client_handler, &(client_i)) != 0)
 		{
 			printf("Error Creating Thread\n");
