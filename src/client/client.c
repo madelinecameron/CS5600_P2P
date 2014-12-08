@@ -23,7 +23,7 @@
 #include <unistd.h>
 #include <sys/fcntl.h>
 #include <errno.h>
-#include "config.ini"
+#include "constants.ini"
 #include "compute_md5.h"
 
 //socket used to connect to server
@@ -33,8 +33,18 @@ int seed_sock;
 
 int seed_port;
 
+int server_update_frequency;
+
+int server_port;
+
+#define SEED 0
+#define DOWNLOAD 1
+int mode;
+int client_i;
+char* ip;
+
 //we aren't really using these
-int server_port, max_client, chunk_size;
+int max_client, chunk_size;
 
 struct peer
 {
@@ -58,27 +68,24 @@ void findIP();
 */
 void readConfig();
 
-#define SEED 0
-#define DOWNLOAD 1
-int mode;
-int client_i;
-char* ip;
 
 int main(int argc, const char* argv[])
 {
-	if (argc < 4)
+	if (argc < 5)
 	{
-		exit(0);
+		readConfig();
 	}
 	else
 	{
+		server_port = 3456;
 		mode = atoi(argv[1]);
 		seed_port = atoi(argv[2]);
 		client_i = atoi(argv[3]);
+		server_update_frequency = atoi(argv[4]); // we should pass a value of "10"
 	}
 
 	//Specifies address: Where we are connecting our socket.
-	struct sockaddr_in server_addr = { AF_INET, htons( SERVER_PORT ) };
+	struct sockaddr_in server_addr = { AF_INET, htons( server_port ) };
 	struct hostent *hp;
 	
 	char buf[CHUNK_SIZE];
@@ -95,7 +102,7 @@ int main(int argc, const char* argv[])
 	
 	if (mode == SEED)
 	{
-		struct sockaddr_in server_addr = { AF_INET, htons( SERVER_PORT ) };
+		struct sockaddr_in server_addr = { AF_INET, htons( server_port ) };
 		struct sockaddr_in client_addr = {AF_INET};
 		int length = sizeof(client_addr);
 		
@@ -120,12 +127,12 @@ int main(int argc, const char* argv[])
 		write(server_sock, buf , strlen(buf));
 		free(md5);
 		
-		/*if (pthread_create(&(peers[0].m_thread), NULL, &client_handler, &(client_i)) != 0)
+		//spin off a single thread that will accept connections, and share chunks
+		if (pthread_create(&(peers[0].m_thread), NULL, &client_handler, &(client_i)) != 0)
 		{
 			printf("Error Creating Thread\n");
 			exit(1);
-		}*/
-		
+		}
 		
 		clock_t elapsed_time, start = clock();
 		int percentage = ((client_i == 1)? (0) : ((client_i * 20) -19));
@@ -133,7 +140,7 @@ int main(int argc, const char* argv[])
 		while (segment_num < 4)
 		{
 			elapsed_time = clock() - start;
-			if (((float)elapsed_time/CLOCKS_PER_SEC) >= 1)// if it's been 10 seconds
+			if (((float)elapsed_time/CLOCKS_PER_SEC) >= server_update_frequency)// if it's been so many seconds
 			{
 				if((server_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 				{
@@ -331,7 +338,7 @@ int main(int argc, const char* argv[])
 
 void *download(void * index)
 {
-	//index in array indicates what segment they are responsible for?
+	//index indicates what segment they are responsible for?
 	// i = 0 -> 1st sub-chunk (0->20%)
 	// i = 1 -> second sub-chunk (21%->40%)
 	int client_index = *((int *) index);
@@ -339,6 +346,7 @@ void *download(void * index)
 	//find that chunk
 	//connect to client who has that chunk
 	//download it
+	//update tracker <updatetracker picture-wallpaper.jpg start end localhost seed_port>
 	//repeat
 	
 	
@@ -480,6 +488,10 @@ void readConfig()
 				case 2:
 					chunk_size = atoi(line);
 					break;
+				/** The fourth line contains the default amount of time (in seconds) the client should wait in between updating the server with new tracker info. */
+				case 3:
+					server_update_frequency = atoi(line);
+					break;
 			}
 			lineCount++;
 		}
@@ -487,14 +499,16 @@ void readConfig()
 	}
 	/** If a config file could not be opened, default values will be assigned:
 	 * server_port = 3456, 
-	 * max_client = 5, and 
-	 * chunk_size = 1024.
+	 * max_client = 5,
+	 * chunk_size = 1024 bytes, and 
+	 * server_update_frequency = 900 seconds (15 minutes)
 	 */
 	else
 	{
 		server_port = 3456;
  		max_client = 5;
  		chunk_size = 1024;
+		server_update_frequency = 900;
 	}
 	
 	return;

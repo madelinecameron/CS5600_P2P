@@ -30,7 +30,7 @@
 #include <time.h>
 #include <dirent.h>
 #include <unistd.h>
-#include "config.ini"
+#include "server_constants.ini"
 #include "compute_md5.h"
 
 /**
@@ -117,12 +117,14 @@ int main(int argc, const char* argv[])
 {
 	/** 
 	 * First checks to see if the server port number was passed in as a parameter.
-	 * If not, readConfig() is called, and a default value is assigned to server_port.
+	 * Over rides default server port with the value passed.
+	 * If no parameters were passed, readConfig() is called, and a default values are assigned.
 	 */
 	switch(argc) 
 	{
 		case 2:
 		{	
+			readConfig();
 			server_port = atoi(argv[1]);
 			break;
 		}
