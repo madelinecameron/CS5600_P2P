@@ -136,9 +136,8 @@ int main(int argc, const char* argv[])
 	}
 	
 	struct sockaddr_in server_addr = {AF_INET, htons( server_port )};
-	struct sockaddr_in client_addr = {AF_INET};
-	/* The length of socketaddr structure */
-	int length = sizeof(client_addr);
+	struct sockaddr *client_addr = NULL;
+	socklen_t *length = NULL;
 	
 	/**
 	 * Create a stream socket. Server will listen on this socket for peers.
@@ -188,7 +187,7 @@ int main(int argc, const char* argv[])
 		if ((client_array_index = findClientArrayOpening()) != -1)
 		{
 			/* Accept the client, and store it's socket ID in the clients array. */
-			if ((clients[client_array_index].m_peer_socket = accept(sock, (struct sockaddr*)&client_addr, &length)) == -1)
+			if ((clients[client_array_index].m_peer_socket = accept(sock, client_addr, length)) == -1)
 			{
 				if (CLOSE_PROGRAM != 1)
 				{
@@ -506,7 +505,7 @@ void *client_handler(void * index)
 		/** <b>GET Command</b> */
 		else if (strncmp(clients[client_index].m_buf, "<GET", strlen("<GET")) == 0)
 		{
-			char *tracker_filename, *filename;
+			char *tracker_filename;
 			char parseFileName[CHUNK_SIZE];
 			
 			/* Get the filename.track */
@@ -587,7 +586,7 @@ void *client_handler(void * index)
 		exit(1);
 	}
 	
-	return;
+	//return;
 }
 
 void setUpClientArray()

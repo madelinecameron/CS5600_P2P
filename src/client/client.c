@@ -399,13 +399,13 @@ void *download(void * index)
 void *client_handler(void * index)
 {
 	/* Dereference the index passed as a parameter by the pthread_create() function */
-	int client_index = *((int *) index);
+	//int client_index = *((int *) index);
 	
 	struct sockaddr_in server_addr = { AF_INET, htons( seed_port ) };
 	struct sockaddr *client_addr = NULL;
 	socklen_t *length = NULL;
 
-	char buf[CHUNK_SIZE];
+	//char buf[CHUNK_SIZE];
 	
 	if((seed_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
 	{
