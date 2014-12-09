@@ -9,7 +9,7 @@
  * gcc client.c -o client.out -lnsl -pthread -lcrypto
  */
  
-#define _GNU_SOURCE //Used for findIP()
+#define _GNU_SOURCE //Used for findIP(), causes problems compiling in C++
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -77,7 +77,7 @@ int main(int argc, const char* argv[])
 	}
 	else
 	{
-		server_port = 3456;
+		server_port = 3457;
 		mode = atoi(argv[1]);
 		seed_port = atoi(argv[2]);
 		client_i = atoi(argv[3]);
@@ -181,7 +181,7 @@ int main(int argc, const char* argv[])
 	{
 		while (1)
 		{
-			if (foundPic == 1)
+			if (foundPic == 1 /* && donwload_finish == false*/)
 			{
 				fgets(buf, sizeof(buf), stdin);
 			}
@@ -294,34 +294,34 @@ int main(int argc, const char* argv[])
 				line  = strtok(NULL, ">");
 				strcpy(filename, line);
 				
-				if (access(filename, F_OK) != 0)
-				{
-					file = fopen(filename, "wb");
+				file = fopen(filename, "wb");
 
-					memset(buf, '\0', sizeof(buf));
-					while((sent = read(server_sock, buf, sizeof(buf))) > 0)
-					{
-						fwrite(buf, sizeof(char), strlen(buf), file);
-						memset(buf, '\0', sizeof(buf));
-					}
-					
-					fclose(file);
-					
-					//spin off 5 downloads thread.
-					int i;
-					for (i = 0; i < 5; i++)
-					{
-						if (pthread_create(&(peers[i].m_thread), NULL, &download, &(peers[i].m_index)) != 0)
-						{
-							perror("Error creating download thread");
-						}
-					}
-				}
-				else
+				memset(buf, '\0', sizeof(buf));
+				while((sent = read(server_sock, buf, sizeof(buf))) > 0)
 				{
-					printf("You already have this tracker file!\n");
+					fwrite(buf, sizeof(char), strlen(buf), file);
+					memset(buf, '\0', sizeof(buf));
+				}
+				
+				fclose(file);
+				
+				//spin off 5 downloads thread.
+				int i;
+				for (i = 0; i < 1; i++) //for debugging purposes, we only spin off 1 thread.
+				{
+					if (pthread_create(&(peers[i].m_thread), NULL, &download, &(peers[i].m_index)) != 0)
+					{
+						perror("Error creating download thread");
+					}
 				}
 			}
+			
+			/*
+			if (download_finish == true)
+			{
+				//call xiao's appendSegment() function too piece together everything
+			}
+			*/
 			close(server_sock);
 		}
 	}
@@ -349,9 +349,47 @@ void *download(void * index)
 	//update tracker <updatetracker picture-wallpaper.jpg start end localhost seed_port>
 	//repeat
 	
-	
-	printf("%d\n", client_index);
+	size_t len = 0;
+	int port;
+	char *line, *temp;
+	//open tracker file
+	FILE *tracker;
+	if ((tracker = fopen("picture-wallpaper.jpg.track", "r")) != NULL)
+	{
+		//get port number
+		do
+		{
+			getline(&line, &len, tracker);
+		} while (strncmp(line, "MD5:", 4) != 0);
 		
+		getline(&line, &len, tracker);
+		strtok(line, ":");
+		temp = strtok(NULL, ":");
+		port = atoi(temp);
+		
+		//connect to that port
+		struct sockaddr_in server_addr = {AF_INET, htons(port)}; 
+		struct hostent *hp; 
+		hp = gethostbyname("localhost");
+		bcopy( hp->h_addr_list[0], (char*)&server_addr.sin_addr, hp->h_length );
+		
+		int new_sock = socket( AF_INET, SOCK_STREAM, 0 );
+		connect(new_sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
+
+		char buf[CHUNK_SIZE];
+		strcpy(buf, "<download picture-wallpaper.jpg.track 0 35738>");
+		int sent = write(new_sock, buf, sizeof(buf));
+		printf("%d\n", sent);
+		
+		
+		free(line);
+		fclose(tracker);
+	}
+	else
+	{
+		printf("Could not open tracker file.");
+	}
+	
 	return;
 }
 
@@ -393,10 +431,7 @@ void *client_handler(void * index)
 		exit(1);
 	}
 	
-	//
 	//This will probably need to be in a loop, because they will accept 1 chunk at a time.....
-	//
-	//
 	if ((peers[0].m_peer_socket = accept(seed_sock, (struct sockaddr*)&client_addr, &length)) == -1)
 	{
 		perror("Server Error: Accepting issue"); 
@@ -406,15 +441,15 @@ void *client_handler(void * index)
 	{
 		printf("A downloading client has connected.\n");
 
-		/******************************
-		 ******************************
-		 *      SHARE FILE HERE       *
-		 *   PEER SHOULD SND MESSAGE  *
-		 *  SAYING WHAT CHUNKS IT WANTS *   
-		 ******************************
-		 ******************************/
-	}
+		char buf[CHUNK_SIZE];
+		int sent;
+		//read download command
+		sent = read(seed_sock, buf, sizeof(buf));
+		perror("error");
+		printf ("%d ", sent);
+		printf("%s\n", buf);
 		
+	}
 	
 	/*When we're done sharing*/
 	if (close(peers[0].m_peer_socket) != 0)

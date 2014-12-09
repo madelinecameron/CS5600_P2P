@@ -331,6 +331,7 @@ void *client_handler(void * index)
 				/** If there was a problem creating the file, send the user a "createtracker fail" protocol message. */
 				else
 				{
+					perror("can't write file");
 					write(clients[client_index].m_peer_socket, "<createtracker fail>\n", strlen("<createtracker fail>\n"));
 				}
 				/* Unlock the mutex. */
