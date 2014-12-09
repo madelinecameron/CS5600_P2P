@@ -443,6 +443,7 @@ void *client_handler(void * index)
 	{
 		printf("A downloading client has connected.\n");
 
+		/*
 		char buf[CHUNK_SIZE];
 		int sent;
 		//read download command
@@ -450,6 +451,7 @@ void *client_handler(void * index)
 		perror("error");
 		printf ("%d ", sent);
 		printf("%s\n", buf);
+		*/
 		
 	}
 	
