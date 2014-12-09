@@ -453,13 +453,13 @@ void myFilePath( int client_index, char* myfile )
 	sprintf( myfile, "./test_clients/client_%d/picture-wallpaper.jpg", client_index );
 }
 
-void fileSperator()
+void fileSperator( char* filename )
 {
 	FILE *file_h;
 	char buf[128];
 	long total_read=0, total_wrote=0;
 	
-	if( ( file_h = fopen( "dog.jpg", "rb" ) ) == NULL ) printf("[ERROR] Error open file\n");
+	if( ( file_h = fopen( filename, "rb" ) ) == NULL ) printf("[ERROR] Error open file\n");
 	
 	fseek( file_h, 0, SEEK_END );
 	int filesize = ftell( file_h );
@@ -467,15 +467,18 @@ void fileSperator()
 	
 	for( int i=1; i<=5; i++ )
 	{
-		char temp[64];
+		char temp[4];
+		char part_file_name[64];
 		FILE* part_file_h;
 		int read, wrote;
 		long total_r=0;
 		
-		sprintf( temp, "dog.%d", i );
+		strcpy( part_file_name, filename );
+		sprintf( temp, ".%d", i );
+		strcat( part_file_name, temp );
 		
-		if( ( part_file_h = fopen( temp, "wb" ) ) == NULL )  printf("[ERROR] Error creating partfile\n");
-		printf( "\r\n[DEBUG] New file: %s ... \n", temp );
+		if( ( part_file_h = fopen( part_file_name, "wb" ) ) == NULL )  printf("[ERROR] Error creating partfile\n");
+		printf( "\r\n[DEBUG] New file: %s ... \n", part_file_name );
 		
 		while( total_r < ( filesize/5 + 128 ) )
 		{
@@ -495,25 +498,30 @@ void fileSperator()
 	
 }
 
-void fileBabyMaking()
+void fileBabyMaking( char* filename )
 {
 	FILE *file_h;
 	char buf[128];
 	long total_read=0, total_wrote=0;
+	char new_filename[64];
 	
-	if( ( file_h = fopen( "baby_dog.jpg", "wb" ) ) == NULL ) printf("[ERROR] Error open file\n");
+	strcpy( new_filename, filename );
+	if( ( file_h = fopen( strcat( new_filename, ".new" ), "wb" ) ) == NULL ) printf("[ERROR] Error open file\n");
 	
 	for( int i=1; i<=5; i++ )
 	{
-		char temp[64];
+		char temp[4];
+		char part_file_name[64];
 		FILE* part_file_h;
 		int read, wrote;
 		long total_w=0;
 		
-		sprintf( temp, "dog.%d", i );
+		strcpy( part_file_name, filename );
+		sprintf( temp, ".%d", i );
+		strcat( part_file_name, temp );
 		
-		if( ( part_file_h = fopen( temp, "rb" ) ) == NULL )  printf("[ERROR] Error opening partfile\n");
-		printf( "\r\n[DEBUG] Processing file: %s ... \n", temp );
+		if( ( part_file_h = fopen( part_file_name, "rb" ) ) == NULL )  printf("[ERROR] Error opening partfile\n");
+		printf( "\r\n[DEBUG] Processing file: %s ... \n", part_file_name );
 		
 		fseek( part_file_h, 0, SEEK_END );
 		int filesize = ftell( part_file_h );

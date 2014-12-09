@@ -236,8 +236,8 @@ void appendSegment( char* tracker_filename, long filesize, int segment_index );
  */
 void myFilePath( int client_index, char* myfile );
 
-void fileSperator();
+void fileSperator( char* filename );
 
-void fileBabyMaking();
+void fileBabyMaking( char* filename );
 
 #endif

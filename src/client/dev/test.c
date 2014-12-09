@@ -105,10 +105,9 @@ int main()
 		myFilePath( 1, myfile_path );
 		printf( "\r[TEST] Testing myFile() : %s\n", myfile_path );
 		
-		printf( "\r[TEST] Testing fileSperator() ... \n" );
-		fileSperator();
-		printf( "\r[TEST] Testing fileBabyMaking() ... \n" );
-		fileBabyMaking();
+		printf( "\r[TEST] Testing fileSperator() and fileBabyMaking() ... \n" );
+		fileSperator( dog_file );
+		fileBabyMaking( dog_file );
 		printf( "\n[TEST] Testing DONE!\n\n" );
 	}
 
