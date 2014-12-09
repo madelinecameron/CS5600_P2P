@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "client_support.h"
 
@@ -26,6 +27,21 @@ int main()
 	
 	//test file handle
 	FILE* test_file_h;
+	
+	test_file_h = fopen( test_tracker_filename, "a+" );
+	
+	for( int n=0; n<10; n++ )
+	{
+		srand(time(NULL));
+		fprintf( test_file_h, "\r\n%s:%d:%d:%d:%d",
+					test_ip_addr,
+					test_port_num,
+					rand(),
+					rand(),
+					rand()
+					);
+	}
+	fclose( test_file_h );
 
 	//run tracker_file_parser()
 	tracker_file_parser( 	test_tracker_filename,
@@ -37,8 +53,8 @@ int main()
 
 	if( TEST_MODE == 1 )
 	{
-		long test_start = 1234567;
-		long test_end = 2345678;
+		long test_start = rand();
+		long test_end = rand();
 		long test_time_stamp = 1999999999;
 
 	

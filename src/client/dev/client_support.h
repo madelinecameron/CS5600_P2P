@@ -18,7 +18,7 @@
 /*-----------------------------------
             Defines
 -----------------------------------*/
-#define DEBUG_MODE 0			///< 1 = ON, 0 = OFF, printout program debug info
+#define DEBUG_MODE 1			///< 1 = ON, 0 = OFF, printout program debug info
 #define TEST_MODE 1				///< 1 = ON, 0 = OFF, printout function testing info
 
 #define CHUNK_SIZE 1024			///< Chunk size in Byte, MAX = 1024
@@ -228,7 +228,13 @@ void appendSegment( char* tracker_filename, long filesize, int segment_index, in
  */
 void myFilePath( int client_index, char* myfile );
 
-
+/**
+ * Seperate of a test file into parts.
+ * This function seperate a test file into the following part file format
+ * 		<b><i> 'filename.ext.#' (# = 1~5) </i></b>
+ * 
+ * @param filename File name for the test file, INPUT.
+ */
 void fileSperator( char* filename );
 
 
