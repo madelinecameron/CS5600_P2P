@@ -9,7 +9,9 @@
  * gcc client.c -o client.out -lnsl -pthread -lcrypto
  */
  
-#define _GNU_SOURCE //Used for findIP(), causes problems compiling in C++
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE //Used for findIP()
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -103,8 +105,8 @@ int main(int argc, const char* argv[])
 	if (mode == SEED)
 	{
 		struct sockaddr_in server_addr = { AF_INET, htons( server_port ) };
-		struct sockaddr_in client_addr = {AF_INET};
-		int length = sizeof(client_addr);
+		//struct sockaddr *client_addr = NULL;
+		//socklen_t *length = NULL;
 		
 		//try to create tracker....
 		if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
@@ -341,7 +343,8 @@ void *download(void * index)
 	//index indicates what segment they are responsible for?
 	// i = 0 -> 1st sub-chunk (0->20%)
 	// i = 1 -> second sub-chunk (21%->40%)
-	int client_index = *((int *) index);
+	
+	//int client_index = *((int *) index);
 	
 	//find that chunk
 	//connect to client who has that chunk
@@ -390,7 +393,7 @@ void *download(void * index)
 		printf("Could not open tracker file.");
 	}
 	
-	return;
+	//return;
 }
 
 void *client_handler(void * index)
@@ -399,9 +402,8 @@ void *client_handler(void * index)
 	int client_index = *((int *) index);
 	
 	struct sockaddr_in server_addr = { AF_INET, htons( seed_port ) };
-	struct sockaddr_in client_addr = {AF_INET};
-	/* The length of socketaddr structure */
-	int length = sizeof(client_addr);
+	struct sockaddr *client_addr = NULL;
+	socklen_t *length = NULL;
 
 	char buf[CHUNK_SIZE];
 	
@@ -432,7 +434,7 @@ void *client_handler(void * index)
 	}
 	
 	//This will probably need to be in a loop, because they will accept 1 chunk at a time.....
-	if ((peers[0].m_peer_socket = accept(seed_sock, (struct sockaddr*)&client_addr, &length)) == -1)
+	if ((peers[0].m_peer_socket = accept(seed_sock, client_addr, length)) == -1)
 	{
 		perror("Server Error: Accepting issue"); 
 		exit(1);
@@ -466,7 +468,7 @@ void *client_handler(void * index)
 		exit(1);
 	}
 	
-	return;
+	//return;
 }
 
 void setUpPeerArray()
