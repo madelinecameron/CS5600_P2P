@@ -112,6 +112,8 @@ int main()
 		printf( "\r[TEST] Testing fileSperator() and fileCat() ... \n" );
 		fileSperator( dog_file );
 		fileCat( dog_file );
+		printf( "\r[TEST] Testing fileSperator() and fileCat() ... \n" );
+		
 		printf( "\n[TEST] Testing DONE!\n\n" );
 	}
 
