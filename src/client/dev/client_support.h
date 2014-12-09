@@ -54,6 +54,15 @@ struct tracked_file_info_struct
 	char	md5[ MD5_SIZE ];					///< MD5 string buffer
 };
 
+/**
+ * Store information of a file segment for seeding.
+ */
+struct segment_struct
+{
+	int start_chunk;
+	int end_chunk;
+};
+
 /*-----------------------------------
         Enums & const string
 -----------------------------------*/
@@ -103,6 +112,18 @@ extern std::vector<chunks_struct> live_chunks;
  * 
  */
 extern std::vector<chunks_struct> pending_chunks;
+
+
+/**
+ * Segment vector.
+ * 
+ * This vector stores segment information for appending the 5% segment
+ * periodicaly.
+ * In download mode, each thread is downloading chunks in its 
+ * corresponding segments. In seed mode, this vector allows segmentational
+ * append of file chunks.
+ */
+extern std::vector<segment_struct> file_segment;
 
 
 /*-----------------------------------
@@ -180,6 +201,17 @@ void clearLiveChunks();
  */
 int isLiveChunk( struct chunks_struct test_chunk );
 
+
+/**
+ * Init segment vector table.
+ * Init segment vector table, populate all 5 segments with start and
+ * end chunk index for each.
+ * 
+ * @param filesize Filesize of the shared file.
+ */
+void initSegments( long filesize );
+
+
 /**
  * Append chunks to existing tracker file.
  * Append chunks until segment is 5% filesize starting from \b start_byte to tracker file.
@@ -189,9 +221,9 @@ int isLiveChunk( struct chunks_struct test_chunk );
  * @param filesize Filesize in bytes -> tracker file, INPUT
  * @param start_byte Starting byte of the segment to be appended -> tracker file, INPUT
  * 
- * @return Ending byte of the segment.
  */
-long appendToTracker( char* tracker_filename, long filesize, long start_byte );
+void appendSegment( char* tracker_filename, long filesize, int segment_index );
+
 
 /**
  * Generate filename with path.
@@ -203,5 +235,9 @@ long appendToTracker( char* tracker_filename, long filesize, long start_byte );
  * 
  */
 void myFilePath( int client_index, char* myfile );
+
+void fileSperator();
+
+void fileBabyMaking();
 
 #endif

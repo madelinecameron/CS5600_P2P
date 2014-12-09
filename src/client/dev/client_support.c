@@ -34,6 +34,8 @@ std::vector<chunks_struct> live_chunks;
 
 std::vector<chunks_struct> pending_chunks;
 
+std::vector<segment_struct> file_segment;
+
 
 /*-----------------------------------
             Functions
@@ -355,66 +357,182 @@ void clearLiveChunks()
 	live_chunks.clear();
 }
 
-/*
- 
 
+/*
+	dog.jpgexample filesize = 43262
+	43262 = 1024*42 + 254, total of 43 chunks
+	43 = 2*20 + 3, first 3 segment will have 3 chunks, rest 2 chunks:
+		0-2, 3-5, 6-8, 9-10, 11-12, ...
+	client - segment list:
+		client[0]  - segment[0-3]
+		client[1]  - segment[4-7]
+		client[2]  - segment[8-11]
+		client[3]  - segment[12-15]
+		client[4]  - segment[16-19]
 */
-long appendToTracker( char* tracker_filename, long filesize, long start_byte )
+void initSegments( long filesize )
 {
-	/** Calculate segment size of 5% of the file */
-	long segment_size = filesize/20;
+	/** Calculate total number of chunks in this segment */
+	long total_num_of_chunks = filesize/CHUNK_SIZE;
+	total_num_of_chunks = ( filesize%CHUNK_SIZE > 0 ) ? total_num_of_chunks+1 : total_num_of_chunks;
 	
-	segment_size = ( ( filesize - start_byte ) < segment_size ) ? ( filesize - start_byte ) : segment_size;
+	int chunk_per_seg = total_num_of_chunks/20;
+	int chunk_remainder = total_num_of_chunks%20;
+	int chunk_start = 0;
 	
-	/** Calculate number of chunks in the segment, rounded down */
-	long num_of_chunks = segment_size/CHUNK_SIZE;
+	file_segment.clear();
 	
-	num_of_chunks = ( segment_size%CHUNK_SIZE > 0 ) ? num_of_chunks+1 : num_of_chunks;
+	for( int n=0; n<20; n++ )
+	{
+		file_segment.push_back( segment_struct() );
+		file_segment[n].start_chunk = chunk_start;
+		file_segment[n].end_chunk = ( chunk_remainder > 0 ) ? chunk_start + chunk_per_seg : chunk_start + chunk_per_seg - 1;
+		
+		/** update starting chunk and chunk remainder */
+		chunk_start = file_segment[n].end_chunk + 1;
+		chunk_remainder--;
+		
+		if( TEST_MODE == 1 ) printf( "[DEBUG] segment[%d] - chunk[%d ~ %d]\n",
+									n,
+									file_segment[n].start_chunk,
+									file_segment[n].end_chunk
+									);
+	}
+}
+
+
+void appendSegment( char* tracker_filename, long filesize, int segment_index )
+{
+	int start_chunk = file_segment[ segment_index ].start_chunk;
+	int end_chunk = file_segment[ segment_index ].end_chunk;
 	
-	/** Initilize start & end byte counter for chunk */
-	long start = start_byte, end = start_byte + CHUNK_SIZE-1, end_seg;
+	int num_of_chunks = end_chunk - start_chunk + 1;
 	
-	end = ( end > filesize ) ? filesize : end;
-	
+	/** new chunks struct as template */
 	chunks_struct chunk;
 	long current_time = ( unsigned ) time( NULL );
 	chunk.time_stamp = current_time;
 	strcpy( chunk.ip_addr, "localhost" );
 	chunk.port_num = test_port_num;
 	
-	for(int z=1; z<6; z++ )
+	if( TEST_MODE == 1 )
 	{
-	long starting_byte = (z-1)*num_of_chunks*CHUNK_SIZE*4;
-		if( TEST_MODE == 1 )
-		{
-			printf( "\r[DEBUG] %ld chunks in this segment, [INFO] start = %ld\n", num_of_chunks, starting_byte );
-		}
+		printf( "\r\n[DEBUG] Appending %d chunks in segment[%d], start_byte = %d\n",
+			 	num_of_chunks,
+			 	segment_index,
+			  	start_chunk*CHUNK_SIZE
+			   	);
 	}
-	for( long n=0; n<num_of_chunks; n++ )
+	
+	long start_byte = start_chunk*CHUNK_SIZE;
+	long end_byte = start_byte + CHUNK_SIZE - 1;
+	
+	for( int n=0; n<num_of_chunks; n++ )
 	{
-		if( start > filesize ) break;
-		chunk.start_byte = start;
-		chunk.end_byte = end;
+		if( start_byte > filesize ) break;
+		chunk.start_byte = start_byte;
+		chunk.end_byte = end_byte;
 		
 		appendChunk( chunk );
-		end_seg = end;
 		
 		if( TEST_MODE == 1 )
 		{
-			printf( "\r[DEBUG] Chunk[ %ld - %ld ] appended\n", start, end );
+			printf( "\r[DEBUG] Chunk[ %ld - %ld ] appended\n", start_byte, end_byte );
 		}
-		start = end+1;
-		end += CHUNK_SIZE;
-		end = ( end > filesize ) ? filesize : end;
+		start_byte = end_byte+1;
+		end_byte += CHUNK_SIZE;
+		end_byte = ( end_byte > filesize ) ? filesize :end_byte;
 	}
 	int rtn = commitPendingChunks( tracker_filename );
 	printf( "[DEBUG] commitPendingChunk() returned %d\n", rtn );
-	
-	return end_seg;
 }
+
 
 void myFilePath( int client_index, char* myfile )
 {
 	sprintf( myfile, "./test_clients/client_%d/picture-wallpaper.jpg", client_index );
+}
+
+void fileSperator()
+{
+	FILE *file_h;
+	char buf[128];
+	long total_read=0, total_wrote=0;
+	
+	if( ( file_h = fopen( "dog.jpg", "rb" ) ) == NULL ) printf("[ERROR] Error open file\n");
+	
+	fseek( file_h, 0, SEEK_END );
+	int filesize = ftell( file_h );
+	fseek( file_h, 0, SEEK_SET );
+	
+	for( int i=1; i<=5; i++ )
+	{
+		char temp[64];
+		FILE* part_file_h;
+		int read, wrote;
+		long total_r=0;
+		
+		sprintf( temp, "dog.%d", i );
+		
+		if( ( part_file_h = fopen( temp, "wb" ) ) == NULL )  printf("[ERROR] Error creating partfile\n");
+		printf( "\r\n[DEBUG] New file: %s ... \n", temp );
+		
+		while( total_r < ( filesize/5 + 128 ) )
+		{
+			read = fread( buf, 1, 128, file_h );
+			wrote = fwrite( buf, 1, read, part_file_h );
+			printf( "\r[DEBUG] total_read = %ld, total wrote = %ld", total_read, total_wrote );
+			total_read += read;
+			total_r += read;
+			total_wrote += wrote;
+			
+			if( total_read == filesize) break;
+		}
+		fclose( part_file_h );
+	}
+	
+	fclose( file_h );
+	
+}
+
+void fileBabyMaking()
+{
+	FILE *file_h;
+	char buf[128];
+	long total_read=0, total_wrote=0;
+	
+	if( ( file_h = fopen( "baby_dog.jpg", "wb" ) ) == NULL ) printf("[ERROR] Error open file\n");
+	
+	for( int i=1; i<=5; i++ )
+	{
+		char temp[64];
+		FILE* part_file_h;
+		int read, wrote;
+		long total_w=0;
+		
+		sprintf( temp, "dog.%d", i );
+		
+		if( ( part_file_h = fopen( temp, "rb" ) ) == NULL )  printf("[ERROR] Error opening partfile\n");
+		printf( "\r\n[DEBUG] Processing file: %s ... \n", temp );
+		
+		fseek( part_file_h, 0, SEEK_END );
+		int filesize = ftell( part_file_h );
+		fseek( part_file_h, 0, SEEK_SET );
+		
+		while(1)
+		{
+			read = fread( buf, 1, 128, part_file_h );
+			wrote = fwrite( buf, 1, read, file_h );
+			printf( "\r[DEBUG] total_read = %ld, total wrote = %ld", total_read, total_wrote );
+			total_read += read;
+			total_w += read;
+			total_wrote += wrote;
+			
+			if( total_w == filesize) break;
+		}
+		fclose( part_file_h );
+	}
+	
+	fclose( file_h );
 }
 
