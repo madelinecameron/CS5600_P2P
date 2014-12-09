@@ -1,22 +1,27 @@
 CC = g++
 CFLAGS = -Wall -g
 LDFLAGS = -lm
+TEST_DIR = src/client/dev/
+CLIENT_DIR = src/client/
+SERVER_DIR = src/server/
 
-client:	src/client/client.c
-	gcc src/client/client.c -o client.out -lnsl -pthread
-	sh test_clients/setup_subfolders.sh
+all: client server
 
-server: src/server/server.c
-	gcc src/server/server.c -o server.out -lnsl -pthread -lcrypto
+client:	${CLIENT_DIR}client.c
+	g++ ${CLIENT_DIR}client.c -o client.out -lnsl -pthread -lcrypto
+#sh test_clients/setup_subfolders.sh
 
-#test : src/client/test.o src/client/client_support.o
-#	${CC} ${CFLAGS} src/client/client_support.o src/client/test.o ${LDFLAGS} -o src/client/test.out
-#	
-#client_support.o : src/client/client_support.c src/client/client_support.h
-#	${CC} ${CFLAGS} -c src/client/client_support.c
-#
-#test.o : src/client/test.c
-#	${CC} ${CFLAGS} -c src/client/test.c
+server: ${SERVER_DIR}server.c
+	g++ ${SERVER_DIR}server.c -o server.out -lnsl -pthread -lcrypto
+
+test: ${TEST_DIR}test.o ${TEST_DIR}client_support.o
+	${CC} ${CFLAGS} ${TEST_DIR}client_support.o ${TEST_DIR}test.o ${LDFLAGS} -o ${TEST_DIR}test.out
+	
+client_support.o: ${TEST_DIR}client_support.c ${TEST_DIR}client_support.h
+	${CC} ${CFLAGS} -c ${TEST_DIR}client_support.c
+
+test.o: ${TEST_DIR}test.c
+	${CC} ${CFLAGS} -c ${TEST_DIR}test.c
 	
 clean:
-	rm *.o *.out
+	rm ${TEST_DIR}*.o ${TEST_DIR}*.out ${CLIENT_DIR}*.out ${SERVER_DIR}*.out

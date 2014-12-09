@@ -28,7 +28,3 @@ do
 		rm -f $DIR"/client_"$z/*
 	fi
 done
-
-
-
-

@@ -19,7 +19,9 @@
 -----------------------------------*/
 int main()
 {
-	//tracker file name for testing
+	//some values/const needed for testing
+	int test_port_num = 12345;
+	const char* test_ip_addr = "localhost";
 	char test_tracker_filename[] = "name.track";
 	
 	//test file handle
@@ -38,6 +40,7 @@ int main()
 		long test_start = 1234567;
 		long test_end = 2345678;
 		long test_time_stamp = 1999999999;
+
 	
 		printf( "\n\r[TEST] Testing commitPendingChunks() & findNextChunk() with start_byte = %ld, end_byte = %ld ...\n",
 				test_start,
@@ -93,11 +96,12 @@ int main()
 		
 		initSegments( dog_size );
 		printf( "[TEST] Segment vector initialized\n" );
+		
 		int client_i = 4;
 		
 		for(int n=client_i*4; n<(client_i+1)*4; n++ )
 		{
-			appendSegment( dog_track, dog_size, n );
+			appendSegment( dog_track, dog_size, n, test_port_num );
 			printf( "[TEST] Segment[%d] appended\n", n );
 		}
 		
@@ -105,9 +109,9 @@ int main()
 		myFilePath( 1, myfile_path );
 		printf( "\r[TEST] Testing myFile() : %s\n", myfile_path );
 		
-		printf( "\r[TEST] Testing fileSperator() and fileBabyMaking() ... \n" );
+		printf( "\r[TEST] Testing fileSperator() and fileCat() ... \n" );
 		fileSperator( dog_file );
-		fileBabyMaking( dog_file );
+		fileCat( dog_file );
 		printf( "\n[TEST] Testing DONE!\n\n" );
 	}
 
