@@ -230,11 +230,12 @@ void myFilePath( int client_index, char* myfile );
 
 /**
  * This function is NOT required for this project.
- * Seperate of a test file into parts.
- * This function seperate a test file into the following part file format
- * 		<b><i> 'filename.ext.#' (# = 1~5) </i></b>
+ * This function parses out a file into 5 equal part files to simulate
+ * a scenario for testing file concatenation, needed to reconstruct file after
+ * all threads successfully finished file download per demo requirement.
  * 
- * @param filename File name for the test file, INPUT.
+ * @param filename File name for the file to be seperated, INPUT.
+ * 
  */
 void fileSperator( char* filename );
 
