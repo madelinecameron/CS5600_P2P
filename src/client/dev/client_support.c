@@ -356,7 +356,7 @@ void clearLiveChunks()
 
 /**
  *	--- The glorious Mathmatics ---
- 
+ *
  *	dog.jpg example filesize = 43262
  *	43262 = 1024*42 + 254, total of 43 chunks
  *	43 = 2*20 + 3, first 3 segment will have 3 chunks, rest 2 chunks:
@@ -368,29 +368,45 @@ void clearLiveChunks()
  *		client[2]  - segment[8-11]
  *		client[3]  - segment[12-15]
  *		client[4]  - segment[16-19]
+ * 
  */
 void initSegments( long filesize )
 {
 	/** Calculate total number of chunks in this segment */
 	long total_num_of_chunks = filesize/CHUNK_SIZE;
+	/** Normalize total number of chunks when there's a remainder */
 	total_num_of_chunks = ( filesize%CHUNK_SIZE > 0 ) ? total_num_of_chunks+1 : total_num_of_chunks;
 	
-	int chunk_per_seg = total_num_of_chunks/20;
-	int chunk_remainder = total_num_of_chunks%20;
+	/** Calculate chunk per segment */
+	int chunk_per_seg = total_num_of_chunks/20;	
+	/** Calculate chunk remainder */
+	int chunk_remainder = total_num_of_chunks%20;	
+	/** Starting chunk buffer */
 	int chunk_start = 0;
-	
+		
+	/** Clear file segment vector before we do anything */
 	file_segment.clear();
-	
+		
+	/**
+	 * Add 20 segments to the vector, each segment represents 5% of the sharing file.
+	 * 
+	 */
 	for( int n=0; n<20; n++ )
 	{
+		/** Push a new segment to vector */
 		file_segment.push_back( segment_struct() );
+		/** Set starting chunk */
 		file_segment[n].start_chunk = chunk_start;
+		/** Set ending chunk to cover remainder */
 		file_segment[n].end_chunk = ( chunk_remainder > 0 ) ? chunk_start + chunk_per_seg : chunk_start + chunk_per_seg - 1;
 		
 		/** update starting chunk and chunk remainder */
 		chunk_start = file_segment[n].end_chunk + 1;
-		chunk_remainder--;
 		
+		/** Decrement on remainder since we got one covered */
+		if( chunk_remainder > 0 ) chunk_remainder--;
+		
+		/** Print out segment starting/ending chunk for debugging */
 		if( TEST_MODE == 1 ) printf( "[DEBUG] segment[%d] - chunk[%d ~ %d]\n",
 									n,
 									file_segment[n].start_chunk,
@@ -402,18 +418,26 @@ void initSegments( long filesize )
 
 void appendSegment( char* tracker_filename, long filesize, int segment_index, int port_num )
 {
+	/** get start chunk from vector */
 	int start_chunk = file_segment[ segment_index ].start_chunk;
+	/** get end chunk from vector */
 	int end_chunk = file_segment[ segment_index ].end_chunk;
 	
+	/** Calculate number of chunks for this segment */
 	int num_of_chunks = end_chunk - start_chunk + 1;
 	
 	/** new chunks struct as template */
 	chunks_struct chunk;
+	/** get current time */
 	long current_time = ( unsigned ) time( NULL );
+	/** assign current time to chunk */
 	chunk.time_stamp = current_time;
+	/** assign ip address to chunk */
 	strcpy( chunk.ip_addr, "localhost" );
+	/** assign port number to chunk */
 	chunk.port_num = port_num;
 	
+	/** print out this segment in test mode for debugging */
 	if( TEST_MODE == 1 )
 	{
 		printf( "\r\n[DEBUG] Appending %d chunks in segment[%d], start_byte = %d\n",
@@ -423,40 +447,53 @@ void appendSegment( char* tracker_filename, long filesize, int segment_index, in
 			   	);
 	}
 	
+	/** Calculate start byte from start chunk */
 	long start_byte = start_chunk*CHUNK_SIZE;
+	/** Calculate end byte from end chunk */
 	long end_byte = start_byte + CHUNK_SIZE - 1;
 	
+	/** Loop through all chunks and append them */
 	for( int n=0; n<num_of_chunks; n++ )
 	{
+		/** break if start byte is greater than filesize */
 		if( start_byte > filesize ) break;
+		
+		/** otherwise set start_byte and end_byte of the chunk */
 		chunk.start_byte = start_byte;
 		chunk.end_byte = end_byte;
 		
+		/** append chunk */
 		appendChunk( chunk );
 		
+		/** printout debug message for this chunk */
 		if( TEST_MODE == 1 )
 		{
 			printf( "\r[DEBUG] Chunk[ %ld - %ld ] appended\n", start_byte, end_byte );
 		}
+		/** update start and end byte */
 		start_byte = end_byte+1;
 		end_byte += CHUNK_SIZE;
+		/** last end byte protection against filesize */
 		end_byte = ( end_byte > filesize ) ? filesize :end_byte;
 	}
+	/** Commit all appending chunks */
 	int rtn = commitPendingChunks( tracker_filename );
+	/** printout debug message */
 	printf( "[DEBUG] commitPendingChunk() returned %d\n", rtn );
 }
 
 
 void myFilePath( int client_index, char* myfile )
 {
+	/** return constum file path as a string per demo requirement */
 	sprintf( myfile, "./test_clients/client_%d/picture-wallpaper.jpg", client_index );
 }
 
 void fileSperator( char* filename )
 {
-	FILE *file_h;
-	char buf[128];
-	long total_read=0, total_wrote=0;
+	FILE *file_h;					///> File handle
+	char buf[128];					///> buffer
+	long total_read=0, total_wrote=0;		///> total number of bytes read and wrote
 	
 	if( ( file_h = fopen( filename, "rb" ) ) == NULL ) printf("[ERROR] Error open file\n");
 	
@@ -499,47 +536,65 @@ void fileSperator( char* filename )
 
 void fileCat( char* filename )
 {
-	FILE *file_h;
-	char buf[128];
-	long total_read=0, total_wrote=0;
-	char new_filename[64];
+	FILE *file_h;					///> File handle
+	char buf[128];					///> buffer
+	long total_read=0, total_wrote=0;		///> total number of bytes read and wrote
+	//char new_filename[64];				///> new filename buffer
 	
-	strcpy( new_filename, filename );
-	if( ( file_h = fopen( strcat( new_filename, ".new" ), "wb" ) ) == NULL ) printf("[ERROR] Error open file\n");
 	
+	/** Copy filename into new filename */
+	//strcpy( new_filename, filename );
+	/** Open new file with new filename */
+	//if( ( file_h = fopen( strcat( new_filename, ".new" ), "wb" ) ) == NULL ) printf("[ERROR] Error open file\n");
+	
+	/** Open file with filename */
+	if( ( file_h = fopen( filename, "wb" ) ) == NULL ) printf("[ERROR] Error open file\n");
+	
+	/** For each part file */
 	for( int i=1; i<=5; i++ )
 	{
-		char temp[4];
-		char part_file_name[64];
-		FILE* part_file_h;
-		int read, wrote;
-		long total_w=0;
+		char temp[4];				///> buffer for file extension
+		char part_file_name[64];		///> part filename buffer
+		FILE* part_file_h;			///> part file handle
+		int read, wrote;			///> number of bytes read and wrote for each action
+		long total_w=0;				///> number of bytes wrote for a part file
 		
+		/** Filename formatting for this part file */
 		strcpy( part_file_name, filename );
 		sprintf( temp, ".%d", i );
 		strcat( part_file_name, temp );
 		
+		/** Open this part file */
 		if( ( part_file_h = fopen( part_file_name, "rb" ) ) == NULL )  printf("[ERROR] Error opening partfile\n");
-		printf( "\r\n[DEBUG] Processing file: %s ... \n", part_file_name );
+		/** print out debug message */
+		if( DEBUG_MODE == 1 ) printf( "\r\n[DEBUG] Processing file: %s ... \n", part_file_name );
 		
+		/** Get filesize for this part file */
 		fseek( part_file_h, 0, SEEK_END );
 		int filesize = ftell( part_file_h );
 		fseek( part_file_h, 0, SEEK_SET );
 		
+		/** copy loop */
 		while(1)
 		{
+			/** Read from part file */
 			read = fread( buf, 1, 128, part_file_h );
+			/** Write to new file */
 			wrote = fwrite( buf, 1, read, file_h );
-			printf( "\r[DEBUG] total_read = %ld, total wrote = %ld", total_read, total_wrote );
+			/** print out debug message */
+			if( DEBUG_MODE == 1 ) printf( "\r[DEBUG] total_read = %ld, total wrote = %ld", total_read, total_wrote );
+			
+			/** Update total bytes read, wrote for this part file and the whole process */
 			total_read += read;
 			total_w += read;
 			total_wrote += wrote;
 			
+			/** If total bytes wrote for the whole process is euqal to filesize, we are done */
 			if( total_w == filesize) break;
 		}
+		/** Close file handle for this part file */
 		fclose( part_file_h );
 	}
-	
+	/** Close file handle for new file */
 	fclose( file_h );
 }
-
