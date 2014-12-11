@@ -229,6 +229,7 @@ void appendSegment( char* tracker_filename, long filesize, int segment_index, in
 void myFilePath( int client_index, char* myfile );
 
 /**
+ * This function is NOT required for this project.
  * Seperate of a test file into parts.
  * This function seperate a test file into the following part file format
  * 		<b><i> 'filename.ext.#' (# = 1~5) </i></b>
