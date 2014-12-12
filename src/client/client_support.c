@@ -2,11 +2,9 @@
  * @file client_support.c
  * @authors Xiao Deng, Matthew Lindner
  *
- * @brief This file will eventually merge with client.c
- * @details 
- *
  * @section COMPILE
  * g++ ./client_support.c -o client_support.out -lnsl -pthread -lcrypto
+ *  (or use make in root directory)
  */
 
 /*-----------------------------------
