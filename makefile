@@ -6,7 +6,6 @@ CLIENT_DIR = src/client/
 SERVER_DIR = src/server/
 
 all: client server
-	@echo "\n ======== CS5600 P2P project Makefile ========\n"
 	@echo "\n ======== [MAKE] Directory management in progress... ========\n"
 	sh test_clients/setup_subfolders.sh
 	@echo "\n ======== [MAKE] DONE! ========\n"
@@ -37,5 +36,5 @@ test.o: ${CLIENT_DIR}test.c
 	
 clean:
 	@echo "\n ======== [MAKE] Cleaning up ... ========\n"
-	rm ${CLIENT_DIR}*.o *.out *.o -rf test_clients/client_*
+	rm ${CLIENT_DIR}*.o ${CLIENT_DIR}*.out *.out *.o -rf test_clients/client_*
 	@echo "\n ======== [MAKE] DONE!  ========\n"

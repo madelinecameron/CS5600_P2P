@@ -13,7 +13,7 @@ do
 		rm -f $DIR"/client_"$z/*
 	fi
 	cd $DIR"/client_"$i
-	wget http://www.photosnewhd.com/media/images/picture-wallpaper.jpg
+	wget -N http://www.photosnewhd.com/media/images/picture-wallpaper.jpg
 	cd ..
 done
 

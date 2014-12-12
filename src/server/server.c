@@ -136,6 +136,7 @@ int main(int argc, const char* argv[])
 			break;
 		}
 	}
+	printf("server_port = %d\n", server_port );
 	
 	struct sockaddr_in server_addr = {AF_INET, htons( server_port )};
 	struct sockaddr *client_addr = NULL;
