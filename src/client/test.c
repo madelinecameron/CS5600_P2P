@@ -4,7 +4,7 @@
  *
  *
  * @section COMPILE
- * See Makefile
+ * Run "make test" in root directory
  */
 
 #include <stdio.h>
