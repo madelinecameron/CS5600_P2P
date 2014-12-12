@@ -124,7 +124,8 @@ int main(int argc, const char* argv[])
 		}
 		
 		memset(buf, '\0', sizeof(buf));
-		char *md5 = computeMD5("picture-wallpaper.jpg");
+		sprintf(buf, "test_clients/client_%d/picture-wallpaper.jpg", client_i);
+		char *md5 = computeMD5(buf);
 		sprintf(buf, "<createtracker picture-wallpaper.jpg 35738 img %s localhost %d>", md5, seed_port); 
 		write(server_sock, buf , strlen(buf));
 		free(md5);
