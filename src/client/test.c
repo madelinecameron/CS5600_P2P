@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "client_support.h"
 
@@ -19,11 +20,28 @@
 -----------------------------------*/
 int main()
 {
-	//tracker file name for testing
+	//some values/const needed for testing
+	int test_port_num = 12345;
+	const char* test_ip_addr = "localhost";
 	char test_tracker_filename[] = "name.track";
 	
 	//test file handle
 	FILE* test_file_h;
+	
+	test_file_h = fopen( test_tracker_filename, "a+" );
+	
+	for( int n=0; n<10; n++ )
+	{
+		srand(time(NULL));
+		fprintf( test_file_h, "\r\n%s:%d:%d:%d:%d",
+					test_ip_addr,
+					test_port_num,
+					rand(),
+					rand(),
+					rand()
+					);
+	}
+	fclose( test_file_h );
 
 	//run tracker_file_parser()
 	tracker_file_parser( 	test_tracker_filename,
@@ -35,9 +53,10 @@ int main()
 
 	if( TEST_MODE == 1 )
 	{
-		long test_start = 1234567;
-		long test_end = 2345678;
+		long test_start = rand();
+		long test_end = rand();
 		long test_time_stamp = 1999999999;
+
 	
 		printf( "\n\r[TEST] Testing commitPendingChunks() & findNextChunk() with start_byte = %ld, end_byte = %ld ...\n",
 				test_start,
@@ -73,16 +92,15 @@ int main()
 		else printf( "[TEST] No next chunk found\n" );
 	
 		//test isLiveChunk()
-		printf( "[TEST] Testing isLiveChunk() \n\r" );
+		printf( "[TEST] Testing isLiveChunk() ... \n\r" );
 		int test_rtn;
 		test_rtn = isLiveChunk( live_chunks[1] );
 		if( test_rtn != NOT_LIVE_CHUNK ) printf( "[TEST] test_chunk is live @ live_chunks[%d]!\n\r", test_rtn );
 		else printf( "[TEST] test_chunk is offline!\n\r" );
 		
-		printf( "[TEST] Testing createNewTracker() \n\r" );
+		printf( "[TEST] Testing createNewTracker() ... \n\r" );
 		char dog_file[] = "dog.jpg";
 		char dog_track[] = "dog.jpg.track";
-		long start_pos = 0;
 		
 		test_file_h = fopen( dog_file, "r" );
 		fseek( test_file_h, 0, SEEK_END ); 				// seek to end of file
@@ -90,22 +108,29 @@ int main()
 		fseek( test_file_h, 0, SEEK_SET ); 				// seek back to beginning of file
 		fclose( test_file_h );
 		
-		printf( "[TEST] Testing file: \"%s\" with filesize = %ld\n", dog_file, dog_size );
+		printf( "[TEST] Testing file: \"%s\" with filesize = %ld ... \n", dog_file, dog_size );
 		
-		for(int x=0; x<7; x++ )
+		initSegments( dog_size );
+		printf( "[TEST] Segment vector initialized\n" );
+		
+		int client_i = 4;
+		
+		for(int n=client_i*4; n<(client_i+1)*4; n++ )
 		{
-			for(int n=0; n<3; n++ )
-			{
-				long l_test_rtn = appendToTracker( dog_track, dog_size, start_pos );
-				printf( "[TEST] Ending byte of this segment: %ld\n", l_test_rtn );
-				start_pos = l_test_rtn+1;
-			}
+			appendSegment( dog_track, dog_size, n, test_port_num );
+			printf( "[TEST] Segment[%d] appended\n", n );
 		}
 		
-		char myfile_name[40];
-		myFile( 1, myfile_name );
-		printf( "\r[TEST] Testing myFile() : %s\n", myfile_name );
-		printf( "[TEST] Testing DONE!\n\n" );
+		char myfile_path[40];
+		myFilePath( 1, myfile_path );
+		printf( "\r[TEST] Testing myFile() : %s\n", myfile_path );
+		
+		printf( "\r[TEST] Testing fileSperator() and fileCat() ... \n" );
+		fileSperator( dog_file );
+		fileCat( dog_file );
+		printf( "\r[TEST] Testing fileSperator() and fileCat() ... \n" );
+		
+		printf( "\n[TEST] Testing DONE!\n\n" );
 	}
 
 	return 0;
