@@ -5,8 +5,10 @@
  * @brief Multi-threaded client that updates server with tracker file and downloads chunks from other clients
  * @details Multi-threaded client that uses separate threads to seed and download chunks to / from other clients.
  *
+ * The client has two modes of execution: seed and download.
+ *
  * @section COMPILE
- * gcc client.c -o client.out -lnsl -pthread -lcrypto
+ * g++ client.c -o client.out -lnsl -pthread -lcrypto
  */
  
 #ifndef _GNU_SOURCE
@@ -28,26 +30,61 @@
 #include "constants.ini"
 #include "compute_md5.h"
 
-//socket used to connect to server
+/**
+ * Socket variable for connecting the tracker server.
+ */
 int server_sock;
-//socket used to act as "server"
+/**
+ * Socket variable accepting connections from other clients. Client listens for connections on this socket.
+ */
 int seed_sock;
-
+/**
+ * Port that other clients can connect to this client on.
+ */
 int seed_port;
-
+/**
+ * Time interval (in seconds) that the client contacts the server with an <updatetracker> command.
+ */
 int server_update_frequency;
-
+/**
+ * The port the tracker server is on.
+ */
 int server_port;
-
-#define SEED 0
-#define DOWNLOAD 1
+/**
+ * Which mode the client is operating in: seed (mode = 0) or download (mode = 1).
+ */
 int mode;
+/**
+ * Constant.
+ */
+#define SEED 0
+/**
+ * Constant.
+ */
+#define DOWNLOAD 1
+/**
+ * Client number (1-5). Passed as a command line argument. Used in the final demonstration to show which client was sharing what file segment (i.e. 1%-5%). 
+ */
 int client_i;
+/**
+ * Stores the IP address of the tracker.
+ * Deprecated.
+ */
 char* ip;
+/**
+ * The maximum number of connections the client can have at a single time, and the maximum number of threads that can be executed at once.
+ */
+int max_client;
+/**
+ * The maximum size (in bytes) of a message sent between two hosts.
+ */
+int chunk_size;
 
-//we aren't really using these
-int max_client, chunk_size;
-
+/**
+ * Represents a peer (client) application.
+ * Each peer is handled with its own thread.
+ * Each peer has it's own: socket, index (in the peers array), buffer (for temporarily storing data), a file pointer, and a thread variable.
+ */
 struct peer
 {
 	int m_peer_socket; ///< Communication socket for this peer. If value = \b -1, this peer is currently not being used.
@@ -57,22 +94,57 @@ struct peer
 	pthread_t m_thread; ///< Thread where commands from peer will be processed.
 };
 
+/**
+ * Array of clients.
+ * \a MAX_CLIENT is the maximum number of connections the client can have at a single time, and the maximum number of threads that can be executed at once.
+ */
 struct peer peers[MAX_CLIENT];
-
+/**
+ * Initializes each peer in the \a peers array.
+ * 
+ * Each \a m_index is set to \b i, the index of the array (0 - \a MAX_CLIENT).
+ * Each \a m_peer_socket is set to \b -1 to indicate that this peer is currently not being used.
+ */
 void setUpPeerArray();
+/**
+ * Returns an index indicating where a new peer can be stored in the \a peers array. Checks each element of the array sequentially until an unused slot is located.
+ * @return Index (0 - \a MAX_CLIENT -1) of the \a clients array where new client will be stored, -1 if array is full (client is currently serving the maximum amount of peers).
+ */
 int findPeerArrayOpening();
-
+/**
+ * Opens the "picture-wallpaper.jpg.track" tracker file. Parses out the port of a peer currently sharing a file chunk, and connects to that peer.
+ * Used when the server is in DOWNLOAD mode.
+ */
 void *download(void * index);
+/**
+ * First enables the peer to accept TCP connections from other peers. Listens for up to \a MAX_CLIENT peers, and prints a message whenever another peer has made a connection.
+ */
 void *client_handler(void * index);
 
-/*
-void findIP();
-*/
+/**
+ * Deprecated. Stores the IP address of this client in the \a IP variable.
+ *
+ * void findIP();
+ */
+ 
+/**
+ * Reads in \a server_port, \a max_client, \a chunk_size, and \a server_update_frequency (in that order) from a config file.
+ * If the config file cannot be opened, or is not found, these variables are given default values: 3456, 10, 1024, and 900 respectfully.
+ */
 void readConfig();
 
-
+/**
+ * When client.out is executed, the client will operate in one of two modes.
+ * In SEED mode, the client first connects to the tracker server and creates a tracker file. It spins of a thread to accept and serve connections (client_handler()), and then updates the tracker server every \a server_update_frequency seconds with new chunks that it is sharing.
+ * In download mode, the client contacts the server every 5 seconds, looking to see if anyone is currently sharing "picture-wallpaper.jpg". Once the server responds with this information, the client downloads the "picture-wallpaper.jpg.track " tracker file from the server, and spins off threads to download the image.
+ *
+ */
 int main(int argc, const char* argv[])
 {
+	/**
+	 * First checks to see if mode, seed_port, client_i, and server_update_frequency were passed in as parameters.
+	 * If no parameters were passed, readConfig() is called, and a default values are assigned.
+	 */
 	if (argc < 5)
 	{
 		readConfig();
@@ -83,40 +155,41 @@ int main(int argc, const char* argv[])
 		mode = atoi(argv[1]);
 		seed_port = atoi(argv[2]);
 		client_i = atoi(argv[3]);
-		server_update_frequency = atoi(argv[4]); // we should pass a value of "10"
+		server_update_frequency = atoi(argv[4]);
 	}
 
-	//Specifies address: Where we are connecting our socket.
+	/* Specifies address: Where we are connecting our socket. */
 	struct sockaddr_in server_addr = { AF_INET, htons( server_port ) };
 	struct hostent *hp;
 	
+	/* A buffer for temporarily storing text used in main. */
 	char buf[CHUNK_SIZE];
 
+	/** Get the IP address of the tracker server.*/
 	if((hp = gethostbyname("localhost")) == NULL)
 	{
 		printf("Error: Unknown Host");
 		exit(1);
 	}
-
 	bcopy( hp->h_addr_list[0], (char*)&server_addr.sin_addr, hp->h_length );
 
+	/** Initialize the client array so each element is marked as unused. */
 	setUpPeerArray();
 	
 	if (mode == SEED)
 	{
+		/** Initialize a TCP connection to the tracker server. */
 		struct sockaddr_in server_addr = { AF_INET, htons( server_port ) };
-		//struct sockaddr *client_addr = NULL;
-		//socklen_t *length = NULL;
 		
-		//try to create tracker....
 		if( ( server_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
 		{
 			perror( "Error: socket failed" );
 			exit( 1 );
 		}
 
-		/*connect to the server */
-		/* now when we need to communicate to the server, we do it over "server_sock" */
+		/** Connect to the server.
+		 * Now when we need to communicate to the server, we do it over "server_sock".
+		*/
 		if (connect( server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr) ) == -1 )
 		{
 			perror( "Error: Connection Issue" );
@@ -124,32 +197,41 @@ int main(int argc, const char* argv[])
 		}
 		
 		memset(buf, '\0', sizeof(buf));
+		
+		/** Calculate the MD5 of the picture file we will be sharing. */
 		sprintf(buf, "test_clients/client_%d/picture-wallpaper.jpg", client_i);
 		char *md5 = computeMD5(buf);
+		/** Contact the tracker server, and try to create a tracker file. */
 		sprintf(buf, "<createtracker picture-wallpaper.jpg 35738 img %s localhost %d>", md5, seed_port); 
 		write(server_sock, buf , strlen(buf));
 		free(md5);
 		
-		//spin off a single thread that will accept connections, and share chunks
+		/** Spin off a single thread that will accept connections, and share chunks. */
+		/* We use the 0th element of the peers array since we only need 1 thread to upload (as per Final Demo requirement. */
 		if (pthread_create(&(peers[0].m_thread), NULL, &client_handler, &(client_i)) != 0)
 		{
 			printf("Error Creating Thread\n");
 			exit(1);
 		}
-		
+
+		/* Clocks used to wait a predetermined amount of time between contacting the server for a list of tracker files.*/
 		clock_t elapsed_time, start = clock();
-		int percentage = ((client_i == 1)? (0) : ((client_i * 20) -19));
+		/* The initial lower bound of the segment percentage we are sharing. (ie 21% for client_i = 1) */
+		int percentage = ((client_i == 1)? (0) : ((client_i * 20) - 19));
 		int increment, segment_num = 0;
+		/* The client shares in 5% increments. 20 / 5 = 4. So we will increment our percentage 4 times. */
 		while (segment_num < 4)
 		{
 			elapsed_time = clock() - start;
-			if (((float)elapsed_time/CLOCKS_PER_SEC) >= server_update_frequency)// if it's been so many seconds
+			/* If it has been so many seconds... */
+			if (((float)elapsed_time/CLOCKS_PER_SEC) >= server_update_frequency)
 			{
 				if((server_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 				{
 					perror( "Error: socket failed" );
 					exit( 1 );
 				}
+				/* Reconnect the the tracker server. */
 				if (connect( server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr) ) == -1 )
 				{
 					perror( "Error: Connection Issue" );
@@ -158,18 +240,12 @@ int main(int argc, const char* argv[])
 				increment = (percentage == 0)? (5) : (4);			
 				
 				printf("I am client_%d, and I am advertising the following chunk of the file: %d%% to %d%%.\n", client_i, percentage, percentage + increment);
-				
-				///////////////////////////////////
-				///////////////////////////////////
-				///I'm not sure the best way to calc/get the start and end bytes here.
-				/////Should I just calculate the start and end bytes myself using (percentage * file size),
-				/////Or Should I call findNextChunk() ?
-				sprintf(buf, "<updatetracker picture-wallpaper.jpg %d %d localhost %d>", percentage /*start byte*/, percentage + increment /*end byte*/, seed_port);			
-				///////////////////////////////////
-				///////////////////////////////////
-				
+
+				/* Update the server, letting it know that we are now sharing an additional 5% of the file. If we had more time, we would have calculated the actual start and end bytes. */
+				sprintf(buf, "<updatetracker picture-wallpaper.jpg %d %d localhost %d>", percentage /*start byte*/, percentage + increment /*end byte*/, seed_port);
 				write(server_sock, buf , strlen(buf));
 				
+				/**Increment the percentage of the file we are sharing. */ 
 				(percentage == 0)? (percentage+=6) : (percentage+=5);
 				segment_num++;
 				
@@ -178,26 +254,34 @@ int main(int argc, const char* argv[])
 		}
 	}
 	
+	/* When foundPic = 1, this means that the server has responded to the <REQ LIST> command indicating that someone is sharing "picture-wallpaper.jpg"
+	   Every 5 seconds, the client will send the <REQ LIST> command and check the servers response. Once somone is sharing the file we want, foundPic = 1.*/
 	int foundPic = 0;
 	int sent;
+	/**
+	 * When presenting in DOWNLOAD mode, the client will automatically contact the tracker server every 5 seconds until someone is sharing the picture-wallpaper.jpg.
+	 * The client will then call the <GET> command, download the tracker file from the server, and spin off a download thread.
+	 * The client will then allow the user to input commands from the keyboard until the client is closed.
+	 */
 	if (mode == DOWNLOAD)
 	{
 		while (1)
 		{
+			/* Once we begin downloading the picture, we will allow the user to input commands. */
 			if (foundPic == 1 /* && donwload_finish == false*/)
 			{
 				fgets(buf, sizeof(buf), stdin);
 			}
 			else
 			{
-				// wait 5 seconds
+				/* Wait 5 seconds. */
 				clock_t elapsed_time, start = clock();
 				do
 				{
 					elapsed_time = clock() - start;
 				} while (((float)elapsed_time/CLOCKS_PER_SEC) < 5);
 			}
-			
+			/* For presenting mode, the <REQ LIST> command will automatically be called (the foundPic == 0 will always be evaluated to true). */
 			if ((strncmp(buf, "<REQ LIST>", strlen("<REQ LIST>")) == 0) || foundPic == 0)
 			{
 				/* create a socket */
@@ -208,29 +292,31 @@ int main(int argc, const char* argv[])
 					exit( 1 );
 				}
 
-				/*connect to the server */
-				/* now when we need to communicate to the server, we do it over "server_sock" */
+				/* connect to the server */
 				if (connect( server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr) ) == -1 )
 				{
 					perror( "Error: Connection Issue" );
 					exit(1);
 				}
 			
+				/* Send the server the <REQ LIST> command. */
 				write(server_sock, "<REQ LIST>", strlen("<REQ LIST>"));
 				memset(buf, '\0', sizeof(buf));
 				while((sent = read(server_sock, buf, sizeof(buf))) > 0)
 				{
+					/* Search the server's message for the picture-wallpaper tracker file. */
 					if (strstr(buf, "picture-wallpaper.jpg") != NULL)
 					{
+						/*Once we find it, set foundPic to 1 to allow keyboard input after the download has begun. */
 						foundPic = 1;
 					}
 					printf("%s", buf);
 					memset(buf, '\0', sizeof(buf));
 				}
 				
+				/* Since buf now contains a <GET> statement, the <GET> command should be invoked below. */
 				if (foundPic == 1)
 				{
-					//Since buf now contains a <GET> statement, the <GET> command should be invoked below.
 					strcpy(buf, "<GET picture-wallpaper.jpg.track>");
 				}
 			}
@@ -247,6 +333,9 @@ int main(int argc, const char* argv[])
 					exit(1);
 				}
 				
+				/* Send the server the <createtracker> command. */
+				write(server_sock, buf, strlen(buf));
+				memset(buf, '\0', sizeof(buf));
 				while((sent = read(server_sock, buf, sizeof(buf))) > 0)
 				{
 					printf("%s", buf);
@@ -273,6 +362,7 @@ int main(int argc, const char* argv[])
 				}
 				printf("\n");
 			}
+			/* When presenting, this code will automatically be executed once someone is sharing the picture-wallpaper.jpg file. */
 			if (strncmp(buf, "<GET", strlen("<GET")) == 0)
 			{
 				FILE *file;
@@ -289,6 +379,7 @@ int main(int argc, const char* argv[])
 					exit(1);
 				}
 			
+				/* Send the tracker server the command. */
 				write(server_sock, buf, strlen(buf));
 				
 				strcpy(tokenize, buf);
@@ -297,20 +388,22 @@ int main(int argc, const char* argv[])
 				line  = strtok(NULL, ">");
 				strcpy(filename, line);
 				
+				/* Create an empty file to save the tracker file in. */
 				file = fopen(filename, "wb");
 
 				memset(buf, '\0', sizeof(buf));
 				while((sent = read(server_sock, buf, sizeof(buf))) > 0)
 				{
+					/* Save the tracker file (sent from server). */
 					fwrite(buf, sizeof(char), strlen(buf), file);
 					memset(buf, '\0', sizeof(buf));
 				}
 				
 				fclose(file);
 				
-				//spin off 5 downloads thread.
+				/* Spin off 5 downloads thread. */
 				int i;
-				for (i = 0; i < 1; i++) //for debugging purposes, we only spin off 1 thread.
+				for (i = 0; i < 1; i++) /* For debugging purposes, we only spin off 1 thread. */
 				{
 					if (pthread_create(&(peers[i].m_thread), NULL, &download, &(peers[i].m_index)) != 0)
 					{
@@ -331,6 +424,7 @@ int main(int argc, const char* argv[])
 	
 	
 	int i;
+	/** Close the program once all threads have completed their work (seeding or downloading). */
 	for (i = 0; i < MAX_CLIENT; i++)
 	{
 		pthread_join(peers[i].m_thread, NULL);
@@ -341,7 +435,7 @@ int main(int argc, const char* argv[])
 
 void *download(void * index)
 {
-	//index indicates what segment they are responsible for?
+	//index indicates what segment they are responsible for
 	// i = 0 -> 1st sub-chunk (0->20%)
 	// i = 1 -> second sub-chunk (21%->40%)
 	
@@ -356,35 +450,40 @@ void *download(void * index)
 	size_t len = 0;
 	int port;
 	char *line, *temp;
-	//open tracker file
+	/* Open tracker file. */
 	FILE *tracker;
 	if ((tracker = fopen("picture-wallpaper.jpg.track", "r")) != NULL)
 	{
-		//get port number
+		/* Read past of the tracker file information. We are currently interested in chunk info. */
 		do
 		{
 			getline(&line, &len, tracker);
 		} while (strncmp(line, "MD5:", 4) != 0);
 		
+		/* Get the port number of a peer sharing a chunk. */
 		getline(&line, &len, tracker);
 		strtok(line, ":");
 		temp = strtok(NULL, ":");
 		port = atoi(temp);
 		
-		//connect to that port
+		/* Connect to the peer at that port. */
 		struct sockaddr_in server_addr = {AF_INET, htons(port)}; 
 		struct hostent *hp; 
 		hp = gethostbyname("localhost");
 		bcopy( hp->h_addr_list[0], (char*)&server_addr.sin_addr, hp->h_length );
 		
 		int new_sock = socket( AF_INET, SOCK_STREAM, 0 );
-		connect(new_sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
+		connect(new_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)); /*Connect. */
 
+		/* Send the serving peer our download request. */
 		char buf[CHUNK_SIZE];
+		/* If we had more time, we would have calculated the actual start and end byte of the chunk we want using the index argument. */
 		strcpy(buf, "<download picture-wallpaper.jpg.track 0 35738>");
+		
+		/* For demo purposes, we are showing that we have successfully sent another peer some data. */
+		/* We wanted to sure that we successfully implemented peer-peer communication. */
 		int sent = write(new_sock, buf, sizeof(buf));
 		printf("%d\n", sent);
-		
 		
 		free(line);
 		fclose(tracker);
@@ -393,8 +492,6 @@ void *download(void * index)
 	{
 		printf("Could not open tracker file.");
 	}
-	
-	//return;
 }
 
 void *client_handler(void * index)
@@ -406,7 +503,7 @@ void *client_handler(void * index)
 	struct sockaddr *client_addr = NULL;
 	socklen_t *length = NULL;
 
-	//char buf[CHUNK_SIZE];
+	/* Enable this client to accept connections from other peers. */
 	
 	if((seed_sock = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
 	{
@@ -421,20 +518,23 @@ void *client_handler(void * index)
 		exit(1);
 	}
 	
-	/** Bind the socket to an internet port. */
+	/* Bind the socket to an internet port. */
 	if (bind(seed_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1 )
 	{
 		perror("Server Error: Bind Failed");
 		exit(1);
 	}
 	
+	/* We will listen for multiple peers. */
 	if (listen(seed_sock, MAX_CLIENT) == -1)
 	{
 		perror("Server Error: Listen failed");
 		exit(1);
 	}
 	
-	//This will probably need to be in a loop, because they will accept 1 chunk at a time.....
+	/* The plan was to continuously listen for connections.
+	 * Peers would send a <download> command indicating which chunk they desired.
+	 * We would then send the chunk, disconnect from that peer, and then wait for annother connection. */
 	if ((peers[0].m_peer_socket = accept(seed_sock, client_addr, length)) == -1)
 	{
 		perror("Server Error: Accepting issue"); 
@@ -442,16 +542,11 @@ void *client_handler(void * index)
 	}
 	else
 	{
+		/* Used to show that we had successfully implemented peer-peer communication. */
 		printf("A downloading client has connected.\n");
 
-		/*
-		char buf[CHUNK_SIZE];
-		int sent;
-		//read download command
+		/* read download command
 		sent = read(seed_sock, buf, sizeof(buf));
-		perror("error");
-		printf ("%d ", sent);
-		printf("%s\n", buf);
 		*/
 		
 	}
@@ -470,8 +565,6 @@ void *client_handler(void * index)
 		perror("Ending thread issue");
 		exit(1);
 	}
-	
-	//return;
 }
 
 void setUpPeerArray()
@@ -555,7 +648,6 @@ void readConfig()
 }
 
 /*
-//Credit to: http://man7.org/linux/man-pages/man3/getifaddrs.3.html
 void findIP()
 {
     struct ifaddrs *ifaddr, *ifa;

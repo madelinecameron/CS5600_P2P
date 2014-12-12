@@ -15,7 +15,7 @@
  * Each client is handled in its own thread. This allows the server to handle multiple clients at a single time.
  *
  * @section COMPILE
- * gcc server.c -o server.out -lnsl -pthread -lcrypto
+ * g++ server.c -o server.out -lnsl -pthread -lcrypto
  */
 
 #include <stdio.h>
@@ -55,7 +55,7 @@ int CLOSE_PROGRAM;
 /**
  * Represents a peer (client) application.
  * Each peer is handled with its own thread.
- * Each peer has it's own: socket, index (in the clients array), buffer (for temporarily storing data), a file pointer, and a thread varaible.
+ * Each peer has it's own: socket, index (in the clients array), buffer (for temporarily storing data), a file pointer, and a thread variable.
  */
 struct peer
 {
@@ -98,11 +98,13 @@ void setUpClientArray();
  */
 int findClientArrayOpening();
 /**
- * Reads in \a server_port, \a max_client, and \a chunk_size (int that order) from a config file.
- * If the config file cannot be opened, or is not found, these variables are given default values: 3456, 10, and 1024 respectful. 
+ * Reads in \a server_port, \a max_client, and \a chunk_size (in that order) from a config file.
+ * If the config file cannot be opened, or is not found, these variables are given default values: 3456, 10, and 1024 respectfully.
  */
 void readConfig();
-
+/**
+ * Captures POSIX signals, in this case CNTRL-C, and initiates the graceful shutdown of the server. Closes \a sock.
+ */
 void signalhandler(int sig);
 
 
@@ -170,7 +172,9 @@ int main(int argc, const char* argv[])
 		exit(1);
 	}
 	
+	/** The server will infinitely loop, accepting connections, until this value is set to 1. Set by the signalhandler(). */
 	CLOSE_PROGRAM = 0;
+	/** Initialize the signalhandler to catch CNTRL-C. */
 	signal(SIGINT, signalhandler);
 	
 	/** Initialize the client array so each element is marked as unused. */
